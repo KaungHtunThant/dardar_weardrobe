@@ -19,7 +19,7 @@ const viewportEl = vm.viewportEl
       :class="vm.canScroll.value ? 'cursor-grab active:cursor-grabbing' : ''"
       tabindex="0"
       role="region"
-      aria-label="Dress form — scroll to move, Ctrl + scroll to zoom"
+      aria-label="Outfit — scroll to move, Ctrl + scroll to zoom"
       data-testid="dress-form"
       @pointerdown="vm.onPointerDown"
       @pointermove="vm.onPointerMove"
@@ -28,7 +28,6 @@ const viewportEl = vm.viewportEl
       @keydown="vm.onKeydown"
     >
       <div class="absolute top-0 left-1/2 will-change-transform" :style="vm.figureStyle.value" data-testid="figure" :data-scale="vm.scale.value">
-        <StudioMannequin />
 
         <button
           v-for="ghost in vm.ghostBoxes.value"
@@ -88,8 +87,5 @@ const viewportEl = vm.viewportEl
         <Icon name="lucide:scan" class="size-4" />
       </button>
     </div>
-    <p class="pointer-events-none absolute right-6 bottom-8 text-[0.7rem] tracking-wide text-taupe/80">
-      Scroll to move · Ctrl + scroll to zoom · Click a piece to browse its category
-    </p>
   </div>
 </template>

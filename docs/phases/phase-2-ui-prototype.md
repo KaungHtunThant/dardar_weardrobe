@@ -56,8 +56,8 @@ Build the whole UI as a working prototype with no backend, so the experience can
 ### Style Studio (`app/pages/studio.vue`), Create-A-Sim style, added at the user's request
 A full-height, two-pane studio inspired by The Sims' character editor.
 
-**Left, the dress form** (`studio/DressForm.vue`, `studio/Mannequin.vue`):
-- A soft cream mannequin wears the current outfit. Each piece snaps to its body slot (`shared/utils/outfit.ts`, `slotFor` / `wear`):
+**Left, the outfit stage** (`studio/DressForm.vue`):
+- The current outfit floats head-to-toe on the backdrop, with no mannequin (removed at the user's request). Each piece snaps to its body position (`shared/utils/outfit.ts`, `slotFor` / `wear`):
   - hats on the head, sunglasses on the face, necklaces and scarves at the neck;
   - the top on the torso, with outerwear behind it so it reads as an open layer;
   - a dress, or bottoms on the legs;

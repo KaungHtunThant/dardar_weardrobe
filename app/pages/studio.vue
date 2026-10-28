@@ -6,7 +6,7 @@ const vm = useStudioPage()
 
 <template>
   <div class="flex h-full overflow-hidden">
-    <!-- Left: the dress form wearing the current outfit -->
+    <!-- Left: the current outfit, each piece floating in its body position -->
     <section class="relative min-w-0 flex-1" aria-label="Outfit">
       <StudioDressForm
         :placed="vm.placed.value"
@@ -17,7 +17,7 @@ const vm = useStudioPage()
 
       <div class="pointer-events-none absolute top-6 left-8 max-w-sm">
         <h1 class="font-display text-4xl font-medium text-ink">Style Studio</h1>
-        <p v-if="!vm.result.value" class="mt-1 text-sm text-taupe">Dress the form, let the AI fill the gaps — then hear the honest truth.</p>
+        <p v-if="!vm.result.value" class="mt-1 text-sm text-taupe">Build an outfit, let the AI fill the gaps — then hear the honest truth.</p>
         <template v-else>
           <p class="mt-2 font-display text-2xl text-ink" data-testid="look-title">{{ vm.result.value.title }}</p>
           <p class="text-sm text-taupe">
@@ -25,6 +25,7 @@ const vm = useStudioPage()
             <span v-if="vm.stale.value"> · outfit changed since it was rated</span>
           </p>
         </template>
+        <p class="mt-2 text-[0.7rem] tracking-wide text-taupe/80">Scroll to move · Ctrl + scroll to zoom · Click a piece to browse its category</p>
       </div>
 
       <button
