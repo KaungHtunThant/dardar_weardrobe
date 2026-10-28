@@ -18,8 +18,8 @@
     "test:e2e": "playwright test",
     "typecheck": "nuxt typecheck && tsc -p tsconfig.electron.json",
     "lint": "eslint .",
-    "dist:linux": "npm run build && electron-builder --linux AppImage",
-    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:linux": "npm run build && electron-builder --linux AppImage --publish never",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never",
     "icon": "node scripts/generate-icon.mjs",
     "test:smoke": "playwright test -c playwright.smoke.config.ts"
   },
