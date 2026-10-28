@@ -84,6 +84,23 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       expect((await gw.listStyleMatches()).some((l) => l.id === look.id)).toBe(true)
     })
 
+    it('reads stylist settings without ever exposing the API key', async () => {
+      const gw = await fresh()
+      const view = await gw.getSettings()
+      expect(['claude-cli', 'claude-api', 'offline']).toContain(view.advisor)
+      expect(view.model).toBeTruthy()
+      const updated = await gw.updateSettings({ advisor: 'offline', model: 'claude-sonnet-5-5', apiKey: 'sk-ant-test-4242' })
+      expect(updated).toMatchObject({ advisor: 'offline', model: 'claude-sonnet-5-5' })
+      expect(updated.apiKey).toMatchObject({ present: true, last4: '4242' })
+      expect(JSON.stringify(await gw.getSettings())).not.toContain('sk-ant-test')
+      expect((await gw.updateSettings({ apiKey: null })).apiKey.present).toBe(false)
+    })
+
+    it('rejects invalid settings', async () => {
+      const gw = await fresh()
+      await expect(gw.updateSettings({ advisor: 'gpt' as never })).rejects.toThrow()
+    })
+
     it('rejects an empty or unknown styling request', async () => {
       const gw = await fresh()
       await expect(gw.generateLook({ pinnedItemIds: [], fillCategories: [] })).rejects.toThrow()

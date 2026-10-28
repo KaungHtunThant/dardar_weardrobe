@@ -12,7 +12,17 @@ import { createApiRouter } from '../../server/http/routes'
 /** Runs the real API (same route table as Nitro) on a random local port. */
 export async function startApi(seed?: { items: Item[]; styleMatches: StyleMatch[] }, options: Partial<ContainerOptions> = {}) {
   const dataDir = mkdtempSync(join(tmpdir(), 'dardar-api-'))
-  const container = await createContainer({ databasePath: ':memory:', imagesDir: join(dataDir, 'images'), seed, ...options })
+  const container = await createContainer({
+    databasePath: ':memory:',
+    imagesDir: join(dataDir, 'images'),
+    dataDir,
+    seed,
+    // Never spawn the real Claude CLI or read a real key in tests.
+    runner: async () => Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+    envApiKey: () => null,
+    defaultAdvisor: 'offline',
+    ...options,
+  })
   const app = createApp().use(createApiRouter(container))
   const server: Server = createServer(toNodeListener(app))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))

@@ -29,10 +29,12 @@ export default defineNuxtConfig({
     ],
   },
   runtimeConfig: {
-    // Server-only; override with NUXT_DATA_DIR / NUXT_DEMO_SEED / NUXT_ALLOW_RESET.
+    // Server-only; override with NUXT_DATA_DIR / NUXT_DEMO_SEED / NUXT_ALLOW_RESET / NUXT_DEFAULT_ADVISOR.
     dataDir: '.data',
     demoSeed: true,
     allowReset: false,
+    // First-run stylist: 'auto' = Claude CLI if installed, else API if a key is set, else offline.
+    defaultAdvisor: 'auto',
     public: {
       // 'http' = local Nitro API; 'mock' = backend-free prototype (NUXT_PUBLIC_GATEWAY=mock).
       gateway: 'http',

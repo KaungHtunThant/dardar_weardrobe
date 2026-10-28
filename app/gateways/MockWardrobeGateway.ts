@@ -3,6 +3,7 @@ import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/c
 import { ItemDetailsSchema, type Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
+import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type Settings, type SettingsUpdate, type SettingsView } from '#shared/models/settings'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
 import { lookFromSuggestion } from '#shared/utils/looks'
 import type { SnapshotStore, WardrobeSnapshot } from './persistence/SnapshotStore'
@@ -34,6 +35,9 @@ export class MockWardrobeGateway implements WardrobeGateway {
   private readonly now: () => Date
   private readonly newId: () => string
   private readonly advisor: StyleAdvisor
+  /** Prototype only: settings live in memory and every mode styles with the offline advisor. */
+  private settings: Settings = { advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium' }
+  private apiKey: string | null = null
 
   constructor(
     private readonly store: SnapshotStore,
@@ -113,5 +117,25 @@ export class MockWardrobeGateway implements WardrobeGateway {
     look.isFavourite = isFavourite
     await this.persist()
     return structuredClone(look)
+  }
+
+  private settingsView(): SettingsView {
+    return {
+      ...this.settings,
+      apiKey: { present: Boolean(this.apiKey), source: this.apiKey ? 'stored' : null, last4: this.apiKey?.slice(-4) ?? null },
+      cli: { available: false, version: null },
+      secureStorage: false,
+    }
+  }
+
+  async getSettings() {
+    return this.settingsView()
+  }
+
+  async updateSettings(update: SettingsUpdate) {
+    const { apiKey, ...changes } = SettingsUpdateSchema.parse(update)
+    if (apiKey !== undefined) this.apiKey = apiKey
+    this.settings = SettingsSchema.parse({ ...this.settings, ...changes })
+    return this.settingsView()
   }
 }

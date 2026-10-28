@@ -10,6 +10,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: 'lucide:house' },
   { to: '/studio', label: 'Studio', icon: 'lucide:wand-sparkles' },
   { to: '/wardrobe', label: 'Wardrobe', icon: 'lucide:shirt' },
+  { to: '/settings', label: 'Settings', icon: 'lucide:settings' },
 ]
 
 export function useDefaultLayout() {

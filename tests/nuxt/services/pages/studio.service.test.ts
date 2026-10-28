@@ -115,4 +115,9 @@ describe('studio page service', () => {
     expect(vm.result.value).toBeNull()
     expect(vm.panelTab.value).toBe('wardrobe')
   })
+
+  it('names the active stylist', async () => {
+    const vm = await ready()
+    expect(vm.stylistLabel.value).toBe('Offline rules')
+  })
 })

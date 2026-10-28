@@ -128,6 +128,10 @@ const vm = useStudioPage()
           <Icon :name="vm.busy.value ? 'lucide:loader-circle' : 'lucide:sparkles'" class="size-4" :class="vm.busy.value ? 'animate-spin' : ''" />
           {{ vm.busy.value ? 'Styling… and judging' : 'Generate & rate' }}
         </button>
+        <p v-if="vm.stylistLabel.value" class="text-center text-[0.7rem] tracking-wide text-taupe" data-testid="stylist-label">
+          Styled by {{ vm.stylistLabel.value }} ·
+          <NuxtLink to="/settings" class="underline underline-offset-2 hover:text-ink">change</NuxtLink>
+        </p>
       </div>
     </aside>
   </div>

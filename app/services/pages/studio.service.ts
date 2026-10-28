@@ -4,6 +4,7 @@ import type { Item } from '#shared/models/item'
 import type { StyleFix } from '#shared/models/styleMatch'
 import { slotFor, wear, type BodySlot } from '#shared/utils/outfit'
 import type { CategoryFilter } from '#shared/utils/wardrobe'
+import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted } from '~/services/lifecycle'
@@ -55,6 +56,7 @@ const GHOST_SLOT: Record<CategoryId, BodySlot> = {
 export function useStudioPage() {
   const wardrobe = useWardrobeStore()
   const looks = useStyleMatchesStore()
+  const settings = useSettingsStore()
 
   const outfitIds = ref<string[]>([])
   const aiIds = ref<string[]>([])
@@ -103,6 +105,18 @@ export function useStudioPage() {
     (result.value?.rating?.fixes ?? []).map((f) => ({ ...f, addItem: byId(f.addItemId), removeItem: byId(f.removeItemId) })),
   )
   const error = computed(() => looks.generateError ?? wardrobe.error)
+  const stylistLabel = computed(() => {
+    switch (settings.view?.advisor) {
+      case 'claude-cli':
+        return 'Claude (Claude Code CLI)'
+      case 'claude-api':
+        return 'Claude (Anthropic API)'
+      case 'offline':
+        return 'Offline rules'
+      default:
+        return ''
+    }
+  })
   const loading = computed(() => !wardrobe.loaded && !wardrobe.error)
 
   function isWorn(id: string) {
@@ -175,7 +189,7 @@ export function useStudioPage() {
   }
 
   function init() {
-    return Promise.all([wardrobe.load(), looks.load()])
+    return Promise.all([wardrobe.load(), looks.load(), settings.load()])
   }
 
   onViewMounted(init)
@@ -197,6 +211,7 @@ export function useStudioPage() {
     scoreLabel,
     fixes,
     error,
+    stylistLabel,
     loading,
     init,
     isWorn,

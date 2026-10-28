@@ -3,6 +3,7 @@ import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/c
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
+import type { SettingsUpdate, SettingsView } from '#shared/models/settings'
 
 /** Talks to the local Nitro API (same origin in the app; an explicit base URL in tests). */
 export class HttpWardrobeGateway implements WardrobeGateway {
@@ -48,5 +49,13 @@ export class HttpWardrobeGateway implements WardrobeGateway {
 
   generateLook(request: StyleRequestInput) {
     return this.call(() => this.api<StyleMatch>('/api/looks/generate', { method: 'POST', body: request }))
+  }
+
+  getSettings() {
+    return this.call(() => this.api<SettingsView>('/api/settings'))
+  }
+
+  updateSettings(update: SettingsUpdate) {
+    return this.call(() => this.api<SettingsView>('/api/settings', { method: 'PUT', body: update }))
   }
 }

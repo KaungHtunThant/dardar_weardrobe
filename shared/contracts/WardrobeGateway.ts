@@ -1,6 +1,7 @@
 import type { Item, ItemDetailsInput } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
 import type { StyleRequestInput } from '../models/styleRequest'
+import type { SettingsUpdate, SettingsView } from '../models/settings'
 
 /** Result of preparing an uploaded photo: the original and the garment-only version. */
 export interface ProcessedPhoto {
@@ -32,5 +33,10 @@ export interface StylingGateway {
   generateLook(request: StyleRequestInput): Promise<StyleMatch>
 }
 
+export interface SettingsGateway {
+  getSettings(): Promise<SettingsView>
+  updateSettings(update: SettingsUpdate): Promise<SettingsView>
+}
+
 /** Everything the frontend needs from the outside world. Stores depend on this, never on an implementation. */
-export interface WardrobeGateway extends ItemGateway, PhotoGateway, StyleMatchGateway, StylingGateway {}
+export interface WardrobeGateway extends ItemGateway, PhotoGateway, StyleMatchGateway, StylingGateway, SettingsGateway {}
