@@ -3,7 +3,6 @@ import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
 import type { AdvisorMode } from '#shared/models/settings'
 import { createContainer } from './container'
 import { createApiRouter } from './http/routes'
-import { ImglyImageProcessor } from './infrastructure/ImglyImageProcessor'
 import { ElectronSecretStore, type ParentPort } from './settings/ElectronSecretStore'
 
 export interface ServerConfig {
@@ -30,7 +29,7 @@ export function useApi(config: ServerConfig) {
       allowReset: config.allowReset,
       dataDir,
       defaultAdvisor: config.defaultAdvisor,
-      processor: new ImglyImageProcessor(),
+      imaging: 'studio',
       // Inside the packaged app the server runs as an Electron utility process: keep the key in the OS keychain.
       secrets: parentPort ? new ElectronSecretStore(parentPort) : undefined,
     })

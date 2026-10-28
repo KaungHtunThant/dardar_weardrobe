@@ -26,3 +26,6 @@ CLAUDE.local.md
 .serena/
 .codebase-memory/
 .jcodemunch/
+
+# Downloaded AI models (npm run models)
+vendor/models/

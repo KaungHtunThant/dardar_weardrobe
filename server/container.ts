@@ -19,11 +19,16 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import { LocalStylistAgent } from './agent/LocalStylistAgent'
 import { openDatabase } from './database/connection'
 import { FsImageStore } from './infrastructure/FsImageStore'
+import { analysisPreview } from './infrastructure/analysisPreview'
+import { GarmentStudioProcessor } from './infrastructure/GarmentStudioProcessor'
+import { ImglyImageProcessor } from './infrastructure/ImglyImageProcessor'
 import { PassThroughImageProcessor } from './infrastructure/PassThroughImageProcessor'
+import { SegformerClothesSegmenter } from './infrastructure/SegformerClothesSegmenter'
 import { SqliteItemRepository } from './repositories/SqliteItemRepository'
 import { SqliteStyleMatchRepository } from './repositories/SqliteStyleMatchRepository'
 import { systemClock, type Clock } from './services/clock'
 import { seedIfEmpty } from './services/demoSeed'
+import { GarmentPipeline } from './services/GarmentPipeline'
 import { ItemService } from './services/ItemService'
 import { PhotoService } from './services/PhotoService'
 import { StyleMatchService } from './services/StyleMatchService'
@@ -43,7 +48,8 @@ export interface ContainerOptions {
   allowReset?: boolean
   /** Folder for settings.json / secrets.json (defaults to the database's folder). */
   dataDir?: string
-  processor?: ImageProcessor
+  /** Cuts garments out of photos; tests leave it out (pass-through), the app uses the garment studio. */
+  imaging?: 'pass-through' | 'studio'
   clock?: Clock
   /** Spawns the Claude CLI; tests pass a fake. */
   runner?: ProcessRunner
@@ -82,6 +88,12 @@ function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: Ad
   }
 }
 
+/** The garment studio (local models) in the app; the photo unchanged in tests. */
+function imageProcessor(imaging: ContainerOptions['imaging']): ImageProcessor {
+  if (imaging !== 'studio') return new PassThroughImageProcessor()
+  return new GarmentStudioProcessor({ matte: new ImglyImageProcessor(), segmenter: new SegformerClothesSegmenter() })
+}
+
 /** Composition root: the only place that knows the concrete server classes. */
 export async function createContainer(options: ContainerOptions) {
   const database = openDatabase(options.databasePath)
@@ -115,9 +127,16 @@ export async function createContainer(options: ContainerOptions) {
   }
   await seed()
 
+  const pipeline = new GarmentPipeline({
+    images,
+    processor: imageProcessor(options.imaging),
+    analyst: () => settings.resolveAnalyst(),
+    preview: options.imaging === 'studio' ? analysisPreview : undefined,
+  })
+
   return {
     items: new ItemService(itemRepo, lookRepo, images, clock),
-    photos: new PhotoService(images, options.processor ?? new PassThroughImageProcessor()),
+    photos: new PhotoService(images, pipeline),
     looks: new StyleMatchService(lookRepo),
     styling: new StylingService(itemRepo, lookRepo, () => settings.resolveAdvisor(), clock),
     settings,

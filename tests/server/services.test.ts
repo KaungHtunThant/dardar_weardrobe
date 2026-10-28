@@ -13,6 +13,8 @@ import { SqliteItemRepository } from '../../server/repositories/SqliteItemReposi
 import { SqliteStyleMatchRepository } from '../../server/repositories/SqliteStyleMatchRepository'
 import { ItemService } from '../../server/services/ItemService'
 import { PhotoService } from '../../server/services/PhotoService'
+import { GarmentPipeline } from '../../server/services/GarmentPipeline'
+import { OfflineGarmentAnalyst } from '../../server/ai/OfflineGarmentAnalyst'
 import { StyleMatchService } from '../../server/services/StyleMatchService'
 import { StylingService } from '../../server/services/StylingService'
 import type { StyleAdvisor, StyleProgress } from '#shared/contracts/StyleAdvisor'
@@ -63,9 +65,14 @@ describe('ItemService', () => {
   })
 })
 
+function photoService(processor: ImageProcessor = new PassThroughImageProcessor()) {
+  const images = new FsImageStore(dir)
+  return new PhotoService(images, new GarmentPipeline({ images, processor, analyst: async () => new OfflineGarmentAnalyst(), log: () => {} }))
+}
+
 describe('PhotoService', () => {
   it('stores the original and the background-removed image', async () => {
-    const service = new PhotoService(new FsImageStore(dir), new PassThroughImageProcessor())
+    const service = photoService()
     const photo = await service.process(PNG, 'image/png')
     expect(photo.originalImage).not.toBe(photo.cleanImage)
     expect(photo.backgroundRemoved).toBe(true)
@@ -73,13 +80,13 @@ describe('PhotoService', () => {
 
   it('keeps the original when background removal fails', async () => {
     const failing: ImageProcessor = { removeBackground: async () => Promise.reject(new Error('model missing')) }
-    const photo = await new PhotoService(new FsImageStore(dir), failing).process(PNG, 'image/png')
+    const photo = await photoService(failing).process(PNG, 'image/png')
     expect(photo.cleanImage).toBe(photo.originalImage)
     expect(photo.backgroundRemoved).toBe(false)
   })
 
   it('rejects files that are not images, or empty', async () => {
-    const service = new PhotoService(new FsImageStore(dir), new PassThroughImageProcessor())
+    const service = photoService()
     await expect(service.process(PNG, 'text/plain')).rejects.toBeInstanceOf(ValidationError)
     await expect(service.process(new Uint8Array(), 'image/png')).rejects.toBeInstanceOf(ValidationError)
   })
