@@ -1,6 +1,7 @@
 import type { GarmentTagger } from '#shared/contracts/GarmentTagger'
 import type { SecretStore } from '#shared/contracts/SecretStore'
 import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
+import type { StylistAgentInfo } from '#shared/models/agent'
 import { ValidationError } from '#shared/errors'
 import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type AdvisorMode, type Settings, type SettingsView } from '#shared/models/settings'
 import { claudeCliVersion } from '../ai/claudeCli'
@@ -21,8 +22,17 @@ export interface TaggerFactory {
   api(settings: Settings, apiKey: string): GarmentTagger
 }
 
+/** The on-device stylist agent, as far as settings are concerned. */
+export interface StylistAgentSetup {
+  info(): StylistAgentInfo | null
+  ensure(): StylistAgentInfo
+  recreate(): StylistAgentInfo
+}
+
 export interface SettingsServiceOptions {
   store: SettingsStore
+  /** The stylist agent every Claude call runs as; set up on first launch. */
+  agent?: StylistAgentSetup
   secrets: SecretStore
   runner: ProcessRunner
   advisors: AdvisorFactory
@@ -65,10 +75,25 @@ export class SettingsService {
     return SettingsSchema.parse({ model: DEFAULT_MODEL, ...saved, advisor })
   }
 
+  /**
+   * First launch (and every start after): makes sure the stylist agent exists and saves the
+   * stylist picked automatically, so the choice no longer changes behind the user's back.
+   */
+  async setUp(): Promise<void> {
+    this.o.agent?.ensure()
+    if (!this.o.store.load()?.advisor) this.o.store.save(await this.current())
+  }
+
+  async recreateAgent(): Promise<SettingsView> {
+    this.o.agent?.recreate()
+    return this.get()
+  }
+
   async get(): Promise<SettingsView> {
     const [settings, key, version] = await Promise.all([this.current(), this.apiKey(), this.cliVersion()])
     return {
       ...settings,
+      agent: this.o.agent?.info() ?? null,
       apiKey: { present: Boolean(key), source: key?.source ?? null, last4: key ? key.key.slice(-4) : null },
       cli: { available: Boolean(version), version },
       keyStorage: await this.o.secrets.storage(),

@@ -34,5 +34,20 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  return { view, saving, error, load, update }
+  /** Sets the on-device stylist agent up again; returns whether it worked. */
+  async function recreateAgent() {
+    saving.value = true
+    error.value = null
+    try {
+      view.value = await useGateway().recreateAgent()
+      return true
+    } catch (e) {
+      error.value = message(e)
+      return false
+    } finally {
+      saving.value = false
+    }
+  }
+
+  return { view, saving, error, load, update, recreateAgent }
 })

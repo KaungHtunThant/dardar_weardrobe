@@ -11,4 +11,8 @@ export class SettingsController {
   async update(event: H3Event) {
     return this.settings.update(await readBody(event))
   }
+
+  recreateAgent() {
+    return this.settings.recreateAgent()
+  }
 }

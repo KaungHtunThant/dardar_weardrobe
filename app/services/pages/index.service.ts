@@ -3,6 +3,7 @@ import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import { localIsoDate, longDayLabel } from '#shared/utils/date'
 import { resolveLookItems } from '#shared/utils/looks'
+import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted, onViewUnmounted } from '../lifecycle'
@@ -24,6 +25,7 @@ const TODAY_STAGES: [afterSeconds: number, label: string][] = [
 export function useHomePage() {
   const wardrobe = useWardrobeStore()
   const looks = useStyleMatchesStore()
+  const settings = useSettingsStore()
   const now = new Date()
   const todayIso = localIsoDate(now)
 
@@ -45,8 +47,18 @@ export function useHomePage() {
   const recent = computed(() => looks.recent(RECENT_LIMIT).map(withItems))
   const favourites = computed(() => looks.favourites.map(withItems))
 
+  /** The one-time introduction to the stylist agent set up on this device. */
+  const welcome = computed(() => {
+    const view = settings.view
+    return view?.agent && !view.welcomed ? { name: view.agent.displayName } : null
+  })
+
+  async function dismissWelcome() {
+    await settings.update({ welcomed: true })
+  }
+
   async function init() {
-    await Promise.all([wardrobe.load(), looks.load()])
+    await Promise.all([wardrobe.load(), looks.load(), settings.view ? null : settings.load()])
     // Styling today's look may take a while with Claude; the rest of Home shows meanwhile.
     await looks.loadToday(todayIso)
   }
@@ -57,5 +69,18 @@ export function useHomePage() {
 
   onViewMounted(init)
 
-  return { loading, error, today, todayLoading, todayStage, recent, favourites, todayLabel: longDayLabel(now), init, toggleFavourite }
+  return {
+    loading,
+    error,
+    welcome,
+    dismissWelcome,
+    today,
+    todayLoading,
+    todayStage,
+    recent,
+    favourites,
+    todayLabel: longDayLabel(now),
+    init,
+    toggleFavourite,
+  }
 }

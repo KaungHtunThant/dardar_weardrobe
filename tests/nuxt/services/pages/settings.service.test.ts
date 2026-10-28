@@ -24,6 +24,16 @@ describe('settings page service', () => {
     expect(vm.form.advisor).toBe('offline')
   })
 
+  it('introduces the stylist agent set up on this device and can recreate it', async () => {
+    const vm = await ready()
+    expect(vm.agent.value).toMatchObject({ name: 'Dardar', runsOn: 'Offline rules' })
+    expect(vm.agent.value!.since).toMatch(/\d{4}/)
+    const spy = vi.spyOn(gateway, 'recreateAgent')
+    await vm.recreateAgent()
+    expect(spy).toHaveBeenCalled()
+    expect(vm.savedMessage.value).toMatch(/Dardar is set up again/)
+  })
+
   it('warns before saving a mode that cannot work yet', async () => {
     const vm = await ready()
     vm.form.advisor = 'claude-api'

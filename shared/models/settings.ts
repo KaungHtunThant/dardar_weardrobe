@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { KeyStorage } from '../contracts/SecretStore'
+import type { StylistAgentInfo } from './agent'
 
 export const ADVISOR_MODES = ['claude-cli', 'claude-api', 'offline'] as const
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
@@ -15,6 +16,8 @@ export const SettingsSchema = z.object({
   model: z.string().trim().min(1).max(100).default(DEFAULT_MODEL),
   /** API only: how hard Claude thinks (cost vs. depth). */
   effort: z.enum(EFFORTS).default('medium'),
+  /** The user has seen the one-time "meet your stylist" welcome. */
+  welcomed: z.boolean().default(false),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -28,7 +31,8 @@ export type SettingsUpdate = z.input<typeof SettingsUpdateSchema>
 export interface SettingsView extends Settings {
   apiKey: { present: boolean; source: 'env' | 'stored' | null; last4: string | null }
   cli: { available: boolean; version: string | null }
-  /** True when the key is encrypted by the OS keychain (packaged app). */
+  /** The stylist agent set up on this device (null until the first launch has set it up). */
+  agent: StylistAgentInfo | null
   /** Where a saved key goes: the OS keychain, a private file (development), or nowhere (no keychain). */
   keyStorage: KeyStorage
 }

@@ -112,6 +112,10 @@ export class HttpWardrobeGateway implements WardrobeGateway {
     return this.call(() => this.api<SettingsView>('/api/settings', { method: 'PUT', body: update }))
   }
 
+  recreateAgent() {
+    return this.call(() => this.api<SettingsView>('/api/agent/recreate', { method: 'POST' }))
+  }
+
   async clearWardrobe() {
     await this.call(() => this.api('/api/wardrobe/clear', { method: 'POST', body: { confirm: true } }))
   }

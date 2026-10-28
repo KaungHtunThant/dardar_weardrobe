@@ -25,11 +25,20 @@ const EFFORTS = [
   { value: 'high', label: 'High', icon: 'lucide:flame' },
 ]
 type Effort = Settings['effort']
+type SettingsForm = Pick<Settings, 'advisor' | 'model' | 'effort'>
+
+const RUNS_ON: Record<AdvisorMode, string> = {
+  'claude-cli': 'Claude Code CLI',
+  'claude-api': 'Anthropic API',
+  offline: 'Offline rules',
+}
+
+const sinceFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
 /** Settings page controller: choose the stylist (Claude CLI / API / Offline), model, effort and API key. */
 export function useSettingsPage() {
   const store = useSettingsStore()
-  const form = reactive<Settings>({ advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium' })
+  const form = reactive<SettingsForm>({ advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium' })
   const apiKeyInput = ref('')
   const savedMessage = ref<string | null>(null)
   const clearOpen = ref(false)
@@ -45,6 +54,13 @@ export function useSettingsPage() {
   watch(() => store.view, syncForm)
 
   const view = computed(() => store.view)
+  /** The stylist agent set up on this device, and what it currently thinks with. */
+  const agent = computed(() => {
+    const info = view.value?.agent
+    if (!info) return null
+    return { name: info.displayName, since: sinceFormat.format(new Date(info.createdAt)), runsOn: RUNS_ON[view.value!.advisor] }
+  })
+
   const keyStatus = computed(() => {
     const key = view.value?.apiKey
     if (!key?.present) return 'No key yet'
@@ -121,6 +137,10 @@ export function useSettingsPage() {
     if (await store.update({ apiKey: null })) flash('Key removed')
   }
 
+  async function recreateAgent() {
+    if (await store.recreateAgent()) flash('Dardar is set up again.')
+  }
+
   function selectAdvisor(mode: AdvisorMode) {
     form.advisor = mode
   }
@@ -166,6 +186,8 @@ export function useSettingsPage() {
     apiKeyInput,
     savedMessage,
     view,
+    agent,
+    recreateAgent,
     modes,
     models: MODELS,
     efforts: EFFORTS,

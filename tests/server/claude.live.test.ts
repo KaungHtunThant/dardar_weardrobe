@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import { describe, expect, it } from 'vitest'
 import type { StyleAdvisor, StyleProgress } from '#shared/contracts/StyleAdvisor'
@@ -6,6 +9,8 @@ import { seedItems } from '#shared/fixtures/seed'
 import { ClaudeApiStyleAdvisor } from '../../server/ai/ClaudeApiStyleAdvisor'
 import { ClaudeCliStyleAdvisor } from '../../server/ai/ClaudeCliStyleAdvisor'
 import { runProcess } from '../../server/ai/process'
+import { LocalStylistAgent } from '../../server/agent/LocalStylistAgent'
+import { systemClock } from '../../server/services/clock'
 
 // Real model calls (cost money / subscription usage). Opt in with RUN_LIVE=1 (+ ANTHROPIC_API_KEY for the API test).
 const request = {
@@ -38,6 +43,17 @@ async function checkStream(advisor: StyleAdvisor) {
 describe.runIf(process.env.RUN_LIVE === '1')('Claude advisors (live)', () => {
   it('CLI streams progress while it styles', async () => {
     await checkStream(new ClaudeCliStyleAdvisor({ runner: runProcess, model: process.env.CLAUDE_MODEL }))
+  }, 240_000)
+
+  it('CLI styles a look as the stylist agent set up on disk', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dardar-live-agent-'))
+    try {
+      const agent = new LocalStylistAgent(dir, systemClock)
+      agent.ensure()
+      check(await new ClaudeCliStyleAdvisor({ runner: runProcess, model: process.env.CLAUDE_MODEL, agent }).suggestLook(request))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   }, 240_000)
 
   it('CLI stops when cancelled', async () => {

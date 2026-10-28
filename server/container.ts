@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ImageProcessor } from '#shared/contracts/ImageProcessor'
 import type { SecretStore } from '#shared/contracts/SecretStore'
+import type { StylistAgent } from '#shared/contracts/StylistAgent'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
 import type { AdvisorMode } from '#shared/models/settings'
 import { ClaudeApiStyleAdvisor } from './ai/ClaudeApiStyleAdvisor'
@@ -12,6 +13,7 @@ import { ClaudeCliTagger } from './ai/ClaudeCliTagger'
 import { runProcess, type ProcessRunner } from './ai/process'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
+import { LocalStylistAgent } from './agent/LocalStylistAgent'
 import { openDatabase } from './database/connection'
 import { FsImageStore } from './infrastructure/FsImageStore'
 import { PassThroughImageProcessor } from './infrastructure/PassThroughImageProcessor'
@@ -49,8 +51,8 @@ export interface ContainerOptions {
   envApiKey?: () => string | null
 }
 
-/** Real AI per mode; one SDK client per API key. */
-function aiFactories(runner: ProcessRunner): { advisors: AdvisorFactory; taggers: TaggerFactory } {
+/** Real AI per mode, every Claude call running as the stylist agent; one SDK client per API key. */
+function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: AdvisorFactory; taggers: TaggerFactory } {
   const offline = new RuleBasedStyleAdvisor()
   const clients = new Map<string, Anthropic>()
   const messages = (apiKey: string) => {
@@ -60,13 +62,13 @@ function aiFactories(runner: ProcessRunner): { advisors: AdvisorFactory; taggers
   return {
     advisors: {
       offline: () => offline,
-      cli: (s) => new ClaudeCliStyleAdvisor({ runner, model: s.model }),
-      api: (s, apiKey) => new ClaudeApiStyleAdvisor({ messages: messages(apiKey), model: s.model, effort: s.effort }),
+      cli: (s) => new ClaudeCliStyleAdvisor({ runner, model: s.model, agent }),
+      api: (s, apiKey) => new ClaudeApiStyleAdvisor({ messages: messages(apiKey), model: s.model, effort: s.effort, agent }),
     },
     taggers: {
       offline: () => ({ suggestDetails: async () => ({}) }),
-      cli: (s) => new ClaudeCliTagger({ runner, model: s.model }),
-      api: (s, apiKey) => new ClaudeApiTagger({ messages: messages(apiKey), model: s.model }),
+      cli: (s) => new ClaudeCliTagger({ runner, model: s.model, agent }),
+      api: (s, apiKey) => new ClaudeApiTagger({ messages: messages(apiKey), model: s.model, agent }),
     },
   }
 }
@@ -81,9 +83,11 @@ export async function createContainer(options: ContainerOptions) {
   const dataDir = options.dataDir ?? (options.databasePath === ':memory:' ? options.imagesDir : dirname(options.databasePath))
   const runner = options.runner ?? runProcess
   const settingsStore = new SettingsStore(join(dataDir, 'settings.json'))
-  const ai = aiFactories(runner)
+  const agent = new LocalStylistAgent(join(dataDir, 'agent'), clock)
+  const ai = aiFactories(runner, agent)
   const settings = new SettingsService({
     store: settingsStore,
+    agent,
     secrets: options.secrets ?? new FileSecretStore(join(dataDir, 'secrets.json')),
     runner,
     advisors: options.advisors ?? ai.advisors,
@@ -91,6 +95,8 @@ export async function createContainer(options: ContainerOptions) {
     envApiKey: options.envApiKey ?? (() => process.env.ANTHROPIC_API_KEY || null),
     defaultAdvisor: options.defaultAdvisor ?? 'auto',
   })
+  // First launch on this device: set up the stylist agent and keep the stylist picked for the user.
+  await settings.setUp()
 
   // After the user clears their wardrobe, demo data must not come back on the next start.
   const clearedMarker = join(dataDir, 'wardrobe-cleared')

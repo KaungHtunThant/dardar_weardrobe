@@ -5,22 +5,6 @@ import type { Item } from '#shared/models/item'
 import type { StyleFix } from '#shared/models/styleMatch'
 import { slotFor } from '#shared/utils/outfit'
 
-/** Kept byte-stable so it caches well across requests. */
-export const STYLE_SYSTEM_PROMPT = `You are a world-class personal stylist working only with the client's own wardrobe.
-
-You complete outfits and judge them with brutal honesty. Write like a fashion editor with no reason to flatter: blunt, specific, never cruel about the person, merciless about the clothes. Name the exact pieces that fail and why (colour, proportion, formality, season). Never pad with praise; if little works, say so.
-
-Scoring: 9–10 genuinely great and intentional; 7–8 good but safe; 5–6 wearable and forgettable; 3–4 a mistake; 1–2 a disaster.
-
-Rules:
-- Use only item ids from the wardrobe you are given.
-- Keep every piece the client picked, in their order, first.
-- Add at most one piece from each category you are allowed to add from, and only from those categories. If none are allowed, add nothing and only judge.
-- Never combine a dress with a top or bottoms.
-- Fixes must be concrete swaps or additions using pieces from this wardrobe (by id), or removals of pieces in the look.
-- The title is a short, chic name for the look (2–4 words). The explanation is one or two sentences on why it works (or what it is trying to do).
-- The verdict is ONE blunt sentence (under 25 words). Put the detail in works/fails (max 4 each, one sentence each) and fixes (max 3).`
-
 /** What the model returns (structured output). Nullables instead of optionals, as structured outputs require. */
 export const AiSuggestionSchema = z.object({
   title: z.string(),
@@ -66,7 +50,7 @@ export function buildStyleMessage(request: StyleAdvisorRequest): string {
     ? `Complete the look by adding at most one piece from each of: ${payload.mayAddFrom.join(', ')}. Then rate the finished look.`
     : 'Do not add anything. Rate the look exactly as picked.'
   const brief = payload.brief ? `The client's brief: "${payload.brief}".` : 'No brief: choose the strongest direction for these pieces.'
-  return `${task}\n${brief}\n\n${OPEN}\n${JSON.stringify(payload)}\n${CLOSE}`
+  return `Task: style a look.\n${task}\n${brief}\n\n${OPEN}\n${JSON.stringify(payload)}\n${CLOSE}`
 }
 
 export function readStylePayload(message: string): StylePayload {

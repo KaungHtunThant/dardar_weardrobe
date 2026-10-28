@@ -46,6 +46,7 @@ export function createApiRouter(c: Container) {
     .post('/api/looks/generate/stream', handle((e) => looks.generateStream(e)))
     .get('/api/settings', handle(() => settings.show()))
     .put('/api/settings', handle((e) => settings.update(e)))
+    .post('/api/agent/recreate', handle(() => settings.recreateAgent()))
     .post('/api/wardrobe/clear', handle((e) => wardrobe.clear(e)))
 
   if (c.allowReset) router.post('/api/dev/reset', handle(async () => ({ reset: await c.reset() })))

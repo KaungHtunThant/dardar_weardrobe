@@ -10,6 +10,7 @@ import { FileSecretStore } from '../../server/settings/FileSecretStore'
 import { SettingsService, type AdvisorFactory } from '../../server/settings/SettingsService'
 import { SettingsStore } from '../../server/settings/SettingsStore'
 import type { ProcessRunner } from '../../server/ai/process'
+import { LocalStylistAgent } from '../../server/agent/LocalStylistAgent'
 
 let dir: string
 beforeEach(() => {
@@ -26,8 +27,9 @@ const factory: AdvisorFactory = {
 const cliPresent: ProcessRunner = async () => ({ code: 0, stdout: '2.1.312 (Claude Code)\n', stderr: '' })
 const cliMissing: ProcessRunner = async () => Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
 
-function service(opts: { runner?: ProcessRunner; env?: string; defaultAdvisor?: 'auto' | 'offline' } = {}) {
+function service(opts: { runner?: ProcessRunner; env?: string; defaultAdvisor?: 'auto' | 'offline'; agent?: LocalStylistAgent } = {}) {
   return new SettingsService({
+    agent: opts.agent,
     store: new SettingsStore(join(dir, 'settings.json')),
     secrets: new FileSecretStore(join(dir, 'secrets.json')),
     runner: opts.runner ?? cliMissing,
@@ -81,6 +83,34 @@ describe('SettingsService', () => {
     expect(await nameOf(await s.resolveAdvisor())).toBe('cli:claude-opus-5-5')
     await s.update({ advisor: 'claude-api', apiKey: 'sk-1', effort: 'low' })
     expect(await nameOf(await s.resolveAdvisor())).toBe('api:claude-opus-5-5:low:sk-1')
+  })
+
+  it('sets up on first launch: creates the stylist agent and saves the stylist it picked', async () => {
+    const agent = new LocalStylistAgent(join(dir, 'agent'), { now: () => new Date('2026-10-28T10:00:00Z'), newId: () => 'x' })
+    const s = service({ runner: cliPresent, agent })
+    await s.setUp()
+    expect(agent.cliAgentsFile()).not.toBeNull()
+    expect(JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')).advisor).toBe('claude-cli')
+    // A later start keeps the saved choice even if the CLI has gone.
+    await service({ runner: cliMissing, agent }).setUp()
+    const view = await service({ runner: cliMissing, agent }).get()
+    expect(view.advisor).toBe('claude-cli')
+    expect(view.agent).toMatchObject({ name: 'dardar-stylist', displayName: 'Dardar', createdAt: '2026-10-28T10:00:00.000Z' })
+  })
+
+  it('remembers that the user has met their stylist', async () => {
+    expect((await service().get()).welcomed).toBe(false)
+    expect((await service().update({ welcomed: true })).welcomed).toBe(true)
+  })
+
+  it('recreates the stylist agent on request', async () => {
+    let now = '2026-10-28T10:00:00Z'
+    const agent = new LocalStylistAgent(join(dir, 'agent'), { now: () => new Date(now), newId: () => 'x' })
+    const s = service({ agent })
+    await s.setUp()
+    now = '2026-11-01T09:00:00Z'
+    expect((await s.recreateAgent()).agent?.createdAt).toBe('2026-11-01T09:00:00.000Z')
+    expect((await service().get()).agent).toBeNull()
   })
 
   it('explains what to do when API mode has no key', async () => {

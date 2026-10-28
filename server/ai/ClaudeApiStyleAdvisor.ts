@@ -1,9 +1,11 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import type { StyleAdvisor, StyleAdvisorRequest, StyleCallOptions, StyleSuggestion } from '#shared/contracts/StyleAdvisor'
+import type { StylistAgent } from '#shared/contracts/StylistAgent'
+import { BUILT_IN_STYLIST } from './agent/builtInStylist'
 import { parsePartialJson } from './partialJson'
 import { styleProgressReporter } from './styleProgress'
-import { AiSuggestionSchema, buildStyleMessage, STYLE_SYSTEM_PROMPT, toSuggestion, type AiSuggestion } from './stylePrompt'
+import { AiSuggestionSchema, buildStyleMessage, toSuggestion, type AiSuggestion } from './stylePrompt'
 
 export const DEFAULT_MODEL = 'claude-opus-5-5'
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
@@ -25,9 +27,14 @@ export interface StreamingMessages {
   ): { on(event: 'text', listener: (delta: string, snapshot: string) => void): unknown; finalMessage(): Promise<StructuredResult> }
 }
 
-/** Styles and rates looks through the Anthropic API with structured JSON output, streamed so progress shows. */
+/** The stylist agent's persona as a cached system prompt. */
+export function agentSystem(agent: StylistAgent = BUILT_IN_STYLIST) {
+  return [{ type: 'text' as const, text: agent.systemPrompt(), cache_control: { type: 'ephemeral' as const } }]
+}
+
+/** Styles and rates looks through the Anthropic API as the stylist agent, with structured JSON output streamed so progress shows. */
 export class ClaudeApiStyleAdvisor implements StyleAdvisor {
-  constructor(private readonly options: { messages: StreamingMessages; model?: string; effort?: Effort }) {}
+  constructor(private readonly options: { messages: StreamingMessages; model?: string; effort?: Effort; agent?: StylistAgent }) {}
 
   async suggestLook(request: StyleAdvisorRequest, { signal, onProgress }: StyleCallOptions = {}): Promise<StyleSuggestion> {
     signal?.throwIfAborted()
@@ -38,7 +45,7 @@ export class ClaudeApiStyleAdvisor implements StyleAdvisor {
         // If a safety classifier declines, the API retries on a suitable fallback model in the same call.
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
-        system: [{ type: 'text', text: STYLE_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        system: agentSystem(this.options.agent),
         messages: [{ role: 'user', content: buildStyleMessage(request) }],
         output_config: { format: betaZodOutputFormat(AiSuggestionSchema), effort: this.options.effort ?? 'medium' },
       },

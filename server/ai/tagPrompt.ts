@@ -3,9 +3,8 @@ import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import { CATEGORY_IDS, CategoryIdSchema } from '#shared/models/category'
 import { OCCASIONS, OccasionSchema, SEASONS, SeasonSchema } from '#shared/models/item'
 
-export const TAG_SYSTEM_PROMPT = `You catalogue garments for a personal wardrobe app. Look at the photo of a single garment (background removed) and describe it precisely and briefly.`
-
-export const TAG_INSTRUCTIONS = `Suggest details for this garment:
+export const TAG_INSTRUCTIONS = `Task: describe a garment.
+Suggest details for this garment:
 - name: a short, specific product-style name (2–4 words, e.g. "Blush Silk Blouse").
 - category: one of ${CATEGORY_IDS.join(', ')}.
 - colors: 1–3 plain colour words, main colour first (e.g. "blush", "navy", "camel").

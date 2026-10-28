@@ -17,6 +17,15 @@ describe('settings store', () => {
     expect(store.view?.apiKey.last4).toBe('1234')
   })
 
+  it('recreates the stylist agent', async () => {
+    const store = useSettingsStore()
+    await store.load()
+    const spy = vi.spyOn(gateway, 'recreateAgent')
+    expect(await store.recreateAgent()).toBe(true)
+    expect(spy).toHaveBeenCalled()
+    expect(store.view?.agent?.name).toBe('dardar-stylist')
+  })
+
   it('keeps the previous view and reports errors', async () => {
     vi.spyOn(gateway, 'updateSettings').mockRejectedValueOnce(new Error('nope'))
     const store = useSettingsStore()

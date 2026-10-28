@@ -23,6 +23,15 @@ describe('home page service', () => {
     expect(vm.favourites.value.every((f) => f.look.isFavourite)).toBe(true)
   })
 
+  it('welcomes the user to their stylist once, until they dismiss it', async () => {
+    const vm = useHomePage()
+    await vm.init()
+    expect(vm.welcome.value).toMatchObject({ name: 'Dardar' })
+    await vm.dismissWelcome()
+    expect(vm.welcome.value).toBeNull()
+    expect((await gateway.getSettings()).welcomed).toBe(true)
+  })
+
   it("moves through the stylist's stages while today's look is being styled", async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
     let finish: (look: null) => void = () => {}

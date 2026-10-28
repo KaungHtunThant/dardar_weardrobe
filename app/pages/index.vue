@@ -15,6 +15,28 @@ const vm = useHomePage()
     </div>
 
     <template v-else>
+      <section
+        v-if="vm.welcome.value"
+        aria-labelledby="welcome-title"
+        class="mb-10 flex items-center gap-5 rounded-[2rem] bg-cream px-8 py-6"
+        data-testid="stylist-welcome"
+      >
+        <Icon name="lucide:sparkles" class="size-6 shrink-0 text-rose" />
+        <div class="min-w-0 flex-1">
+          <h2 id="welcome-title" class="font-display text-2xl text-ink">Meet {{ vm.welcome.value.name }}, your stylist</h2>
+          <p class="mt-1 text-sm text-taupe">
+            {{ vm.welcome.value.name }} was set up on this computer just for you. It cuts out every piece you add, fills in the details and styles your looks.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="h-10 shrink-0 rounded-full bg-rose px-5 text-sm font-medium text-white transition-colors hover:bg-[#ad6b72]"
+          @click="vm.dismissWelcome"
+        >
+          Lovely
+        </button>
+      </section>
+
       <HomeTodayHero
         v-if="vm.today.value"
         :entry="vm.today.value"

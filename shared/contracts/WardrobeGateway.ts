@@ -50,6 +50,8 @@ export interface StylingGateway {
 export interface SettingsGateway {
   getSettings(): Promise<SettingsView>
   updateSettings(update: SettingsUpdate): Promise<SettingsView>
+  /** Sets the on-device stylist agent up again from scratch. */
+  recreateAgent(): Promise<SettingsView>
 }
 
 export interface DataGateway {

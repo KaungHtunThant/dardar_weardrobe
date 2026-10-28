@@ -1,4 +1,7 @@
+import { dirname } from 'node:path'
 import { z } from 'zod'
+import type { StylistAgent } from '#shared/contracts/StylistAgent'
+import { BUILT_IN_STYLIST } from './agent/builtInStylist'
 import { parsePartialJson } from './partialJson'
 import type { ProcessRunner } from './process'
 
@@ -8,6 +11,8 @@ export interface ClaudeCliOptions {
   command?: string
   /** Model alias or id; omitted = the CLI's own default. */
   model?: string
+  /** The stylist agent the call runs as (defaults to the built-in persona). */
+  agent?: StylistAgent
 }
 
 interface CliResult {
@@ -86,14 +91,14 @@ function lastResult(stdout: string): CliResult {
 }
 
 /**
- * Runs `claude -p` once with a JSON schema and returns the validated structured output.
+ * Runs `claude -p` once, as the stylist agent, with a JSON schema and returns the validated structured output.
+ * With an agents file the CLI runs `--agent` from it, inside the agent's folder; otherwise the persona is the system prompt.
  * The prompt goes over stdin; tools are off unless explicitly allowed.
  * With `onPartial`, the answer is streamed and reported as it is written; `signal` kills the process.
  */
 export async function runClaudeCli<S extends z.ZodType>(
   options: ClaudeCliOptions,
   call: {
-    system: string
     prompt: string
     schema: S
     jsonSchema: object
@@ -105,12 +110,14 @@ export async function runClaudeCli<S extends z.ZodType>(
 ): Promise<z.output<S>> {
   const command = options.command ?? 'claude'
   const streaming = !!call.onPartial
+  const agent = options.agent ?? BUILT_IN_STYLIST
+  const agentsFile = agent.cliAgentsFile()
   const args = [
     '-p',
     '--output-format', streaming ? 'stream-json' : 'json',
     ...(streaming ? ['--verbose', '--include-partial-messages'] : []),
     '--json-schema', JSON.stringify(call.jsonSchema),
-    '--system-prompt', call.system,
+    ...(agentsFile ? ['--agents', agentsFile, '--agent', agent.name] : ['--system-prompt', agent.systemPrompt()]),
     '--tools', (call.tools ?? []).join(','),
     '--no-session-persistence',
   ]
@@ -122,6 +129,7 @@ export async function runClaudeCli<S extends z.ZodType>(
   try {
     out = await options.runner(command, args, {
       input: call.prompt,
+      cwd: agentsFile ? dirname(agentsFile) : undefined,
       signal: call.signal,
       onStdout: call.onPartial ? structuredOutputStream(call.onPartial) : undefined,
     })

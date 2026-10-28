@@ -11,6 +11,24 @@ const vm = useSettingsPage()
 
     <p v-if="vm.error.value" role="alert" class="mt-6 rounded-xl bg-blush-soft px-4 py-3 text-sm text-rose">{{ vm.error.value }}</p>
 
+    <section v-if="vm.agent.value" aria-labelledby="agent-title" class="mt-10 flex items-center gap-5 rounded-2xl bg-cream px-6 py-5" data-testid="stylist-agent">
+      <span class="grid size-12 shrink-0 place-items-center rounded-full bg-surface text-rose">
+        <Icon name="lucide:sparkles" class="size-5" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <h2 id="agent-title" class="font-display text-2xl text-ink">{{ vm.agent.value.name }}, your stylist</h2>
+        <p class="text-sm text-taupe">Set up on this computer on {{ vm.agent.value.since }}. Thinks with: {{ vm.agent.value.runsOn }}.</p>
+      </div>
+      <button
+        type="button"
+        :disabled="vm.saving.value"
+        class="h-9 shrink-0 rounded-full border border-line px-4 text-xs text-taupe transition-colors hover:border-blush hover:text-ink disabled:opacity-50"
+        @click="vm.recreateAgent"
+      >
+        Set up again
+      </button>
+    </section>
+
     <section aria-labelledby="stylist-title" class="mt-10">
       <h2 id="stylist-title" class="mb-4 font-display text-2xl text-ink">Your stylist</h2>
       <div role="radiogroup" aria-labelledby="stylist-title" class="grid gap-3">

@@ -166,6 +166,15 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       expect((await gw.updateSettings({ apiKey: null })).apiKey.present).toBe(false)
     })
 
+    it('has a stylist agent set up, which can be recreated, and remembers the welcome', async () => {
+      const gw = await fresh()
+      const view = await gw.getSettings()
+      expect(view.agent).toMatchObject({ name: 'dardar-stylist', displayName: 'Dardar' })
+      expect(view.welcomed).toBe(false)
+      expect((await gw.updateSettings({ welcomed: true })).welcomed).toBe(true)
+      expect((await gw.recreateAgent()).agent).toMatchObject({ name: 'dardar-stylist' })
+    })
+
     it('clears the whole wardrobe but keeps the settings', async () => {
       const gw = await fresh()
       await gw.updateSettings({ advisor: 'offline', model: 'claude-haiku-5-5' })

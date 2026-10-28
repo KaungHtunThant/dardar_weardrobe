@@ -36,7 +36,8 @@ export class MockWardrobeGateway implements WardrobeGateway {
   private readonly newId: () => string
   private readonly advisor: StyleAdvisor
   /** Prototype only: settings live in memory and every mode styles with the offline advisor. */
-  private settings: Settings = { advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium' }
+  private settings: Settings = { advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium', welcomed: false }
+  private agentCreatedAt = new Date().toISOString()
   private apiKey: string | null = null
 
   constructor(
@@ -191,8 +192,14 @@ export class MockWardrobeGateway implements WardrobeGateway {
       ...this.settings,
       apiKey: { present: Boolean(this.apiKey), source: this.apiKey ? 'stored' : null, last4: this.apiKey?.slice(-4) ?? null },
       cli: { available: false, version: null },
+      agent: { name: 'dardar-stylist', displayName: 'Dardar', version: 1, createdAt: this.agentCreatedAt },
       keyStorage: 'private-file',
     }
+  }
+
+  async recreateAgent() {
+    this.agentCreatedAt = new Date().toISOString()
+    return this.settingsView()
   }
 
   async getSettings() {
