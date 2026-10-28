@@ -5,7 +5,7 @@ import type { CategoryFilter } from '#shared/utils/wardrobe'
 import { useWardrobePanel } from '~/services/components/studio/WardrobePanel.service'
 
 const props = defineProps<{ items: Item[]; category: CategoryFilter; wornIds: string[]; wornCategories: CategoryId[] }>()
-const emit = defineEmits<{ 'select-category': [id: CategoryFilter]; toggle: [id: string] }>()
+const emit = defineEmits<{ 'select-category': [id: CategoryFilter]; toggle: [id: string]; details: [id: string] }>()
 const vm = useWardrobePanel(props, emit)
 </script>
 
@@ -32,13 +32,12 @@ const vm = useWardrobePanel(props, emit)
 
     <div class="min-h-0 flex-1 overflow-y-auto p-4">
       <div class="grid grid-cols-3 gap-3" data-testid="panel-grid">
+        <div v-for="item in items" :key="item.id" class="group relative">
         <button
-          v-for="item in items"
-          :key="item.id"
           type="button"
           :aria-pressed="vm.isWorn(item.id)"
           :aria-label="`${vm.isWorn(item.id) ? 'Take off' : 'Wear'} ${item.name}`"
-          class="group relative flex flex-col text-left"
+          class="flex w-full flex-col text-left"
           @click="vm.toggle(item.id)"
         >
           <div
@@ -55,6 +54,15 @@ const vm = useWardrobePanel(props, emit)
           </span>
           <span class="mt-1.5 truncate px-0.5 text-[0.7rem] text-ink">{{ item.name }}</span>
         </button>
+        <button
+          type="button"
+          :aria-label="`Details for ${item.name}`"
+          class="absolute top-1.5 left-1.5 grid size-6 place-items-center rounded-full bg-surface/90 text-taupe opacity-0 shadow-soft transition-opacity group-hover:opacity-100 hover:text-ink focus:opacity-100"
+          @click="vm.details(item.id)"
+        >
+          <Icon name="lucide:info" class="size-3.5" />
+        </button>
+        </div>
       </div>
     </div>
   </div>

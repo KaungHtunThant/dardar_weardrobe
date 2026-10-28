@@ -32,4 +32,16 @@ export class SqliteItemRepository implements ItemRepository {
     await this.db.insert(items).values({ brand: null, size: null, notes: null, ...item })
     return item
   }
+
+  async update(item: Item) {
+    const { id, ...rest } = item
+    await this.db.update(items).set({ brand: null, size: null, notes: null, ...rest }).where(eq(items.id, id))
+    return item
+  }
+
+  async delete(id: string) {
+    const existed = (await this.findById(id)) !== null
+    if (existed) await this.db.delete(items).where(eq(items.id, id))
+    return existed
+  }
 }

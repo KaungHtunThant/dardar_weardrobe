@@ -29,6 +29,7 @@ const vm = useWardrobePage()
         :items="vm.closetItems.value"
         class="min-h-0 flex-1"
         @close="vm.closeCloset"
+        @open-item="vm.openItem"
       />
       <div v-else class="grid min-h-0 flex-1 grid-cols-7 gap-4" data-testid="closet-wall">
         <WardrobeClosetTile
@@ -46,7 +47,7 @@ const vm = useWardrobePage()
         <WardrobeCategoryBar :counts="vm.counts.value" :selected="vm.listFilter.value" @select="vm.setFilter" />
       </div>
       <div v-if="vm.listItems.value.length" class="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-x-6 gap-y-10" data-testid="item-grid">
-        <WardrobeItemCard v-for="item in vm.listItems.value" :key="item.id" :item="item" />
+        <WardrobeItemCard v-for="item in vm.listItems.value" :key="item.id" :item="item" @open="vm.openItem" />
       </div>
       <UiEmptyState
         v-else-if="!vm.loading.value"
@@ -57,6 +58,7 @@ const vm = useWardrobePage()
     </template>
 
     <UiFab label="Add item" @click="vm.openAdd" />
+    <ItemDetailSheet :item-id="vm.openItemId.value" @close="vm.closeItem" />
     <ItemAddDialog :open="vm.isAddOpen.value" :default-category="vm.addDefaultCategory.value" @update:open="vm.setAddOpen" />
   </div>
 </template>

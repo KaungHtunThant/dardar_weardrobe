@@ -19,6 +19,11 @@ export class LookController {
     return this.looks.list()
   }
 
+  async delete(event: H3Event) {
+    await this.looks.delete(getRouterParam(event, 'id') ?? '')
+    return { deleted: true }
+  }
+
   async setFavourite(event: H3Event) {
     const { isFavourite } = parseOrThrow(FavouriteSchema, await readBody(event))
     return this.looks.setFavourite(getRouterParam(event, 'id') ?? '', isFavourite)

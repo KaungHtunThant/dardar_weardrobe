@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { CreateItemInput } from '#shared/contracts/WardrobeGateway'
-import type { Item } from '#shared/models/item'
+import type { CreateItemInput, ProcessedPhoto } from '#shared/contracts/WardrobeGateway'
+import type { Item, ItemDetailsInput } from '#shared/models/item'
 import { countByCategory, filterByCategory, sortNewestFirst, type CategoryFilter } from '#shared/utils/wardrobe'
 import { useGateway } from '~/gateways/provider'
+import { useStyleMatchesStore } from './styleMatches'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -47,6 +48,26 @@ export const useWardrobeStore = defineStore('wardrobe', () => {
     return useGateway().suggestDetails(cleanImage)
   }
 
+  function replace(item: Item) {
+    raw.value = raw.value.map((i) => (i.id === item.id ? item : i))
+    return item
+  }
+
+  async function updateItem(id: string, details: ItemDetailsInput) {
+    return replace(await useGateway().updateItem(id, details))
+  }
+
+  async function replaceItemPhoto(id: string, photo: ProcessedPhoto) {
+    return replace(await useGateway().replaceItemPhoto(id, photo))
+  }
+
+  /** Deletes the piece; looks that contained it change on the backend, so they are reloaded. */
+  async function deleteItem(id: string) {
+    await useGateway().deleteItem(id)
+    raw.value = raw.value.filter((i) => i.id !== id)
+    await useStyleMatchesStore().reload()
+  }
+
   /** Deletes everything on the backend and empties this store. */
   async function clearAll() {
     await useGateway().clearWardrobe()
@@ -60,5 +81,5 @@ export const useWardrobeStore = defineStore('wardrobe', () => {
     return item
   }
 
-  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, suggestDetails, addItem, clearAll }
+  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, suggestDetails, addItem, updateItem, replaceItemPhoto, deleteItem, clearAll }
 })

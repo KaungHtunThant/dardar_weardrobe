@@ -20,7 +20,7 @@ describe('studio page', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="dress-form"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="ai-slot"]')).toHaveLength(4)
-    expect(wrapper.findAll('[data-testid="panel-grid"] button')).toHaveLength(33)
+    expect(wrapper.findAll('[data-testid="panel-grid"] > div')).toHaveLength(33)
   })
 
   it('dresses the form from the panel and filters the panel from the form', async () => {
@@ -30,7 +30,7 @@ describe('studio page', () => {
     const piece = wrapper.get('[data-testid="worn-piece"]')
     expect(piece.attributes('data-slot')).toBe('feet')
     await piece.trigger('click')
-    expect(wrapper.findAll('[data-testid="panel-grid"] button')).toHaveLength(4)
+    expect(wrapper.findAll('[data-testid="panel-grid"] > div')).toHaveLength(4)
   })
 
   it('shows the verdict after generating', async () => {

@@ -15,6 +15,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | [phases/phase-1-domain-model.md](phases/phase-1-domain-model.md) | Models, contracts, utilities and seed data |
 | [phases/phase-2-ui-prototype.md](phases/phase-2-ui-prototype.md) | The frontend prototype on a mock gateway: Home, Wardrobe, Add item, Style Studio |
 | [phases/phase-3-backend.md](phases/phase-3-backend.md) | Nitro controllers, SQLite (`node:sqlite`) persistence, image storage, HTTP gateway |
+| [phases/phase-5.md](phases/phase-5.md) | Managing pieces (edit/delete), Looks library, faster-feeling AI, installer |
 | [phases/phase-4-ai.md](phases/phase-4-ai.md) | Local background removal; Claude (CLI or API) or Offline styling and brutal ratings; settings; daily pick; add-item pre-fill |
 
 ## Phase status
@@ -26,6 +27,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | 2: UI prototype | Done, awaiting review | `1e0c0a4`, `a9fe6aa`, `745e576`, `079603e`, `09b754b`, `5cd5013` |
 | 3: Backend | Done | `8c238ef` |
 | 4: AI | Done | `4072a35`, `e8f0760`, `879c622` |
+| 5: Manage, library, streaming, installer | In progress (Step 1 done) | |
 
 ## Running the app
 

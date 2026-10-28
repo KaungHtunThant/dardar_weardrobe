@@ -107,4 +107,17 @@ describe('wardrobe page service', () => {
     expect(vm.isAddOpen.value).toBe(true)
     expect(vm.addDefaultCategory.value).toBe('bags')
   })
+
+  it('opens a piece in the detail sheet through the URL, and closes it', async () => {
+    await at({ view: 'list' })
+    const push = vi.spyOn(useRouter(), 'push')
+    const vm = useWardrobePage()
+    vm.openItem('item-linen-tee')
+    expect(push).toHaveBeenCalledWith({ query: { view: 'list', item: 'item-linen-tee' } })
+    await at({ view: 'list', item: 'item-linen-tee' })
+    expect(vm.openItemId.value).toBe('item-linen-tee')
+    const replace = vi.spyOn(useRouter(), 'replace')
+    vm.closeItem()
+    expect(replace).toHaveBeenCalledWith({ query: { view: 'list' } })
+  })
 })

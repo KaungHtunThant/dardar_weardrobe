@@ -115,3 +115,29 @@ describe('lookFromSuggestion', () => {
     expect(lookFromSuggestion({ title: 'T', itemIds: ['a'], aiItemIds: [], explanation: '', rating }, {}, 'x', new Date()).prompt).toBeUndefined()
   })
 })
+
+describe('withoutItem', () => {
+  it('drops the piece from a look, its AI picks and fixes that mention it', async () => {
+    const { withoutItem } = await import('#shared/utils/looks')
+    const l = look('x', '2026-10-01T00:00:00.000Z', {
+      itemIds: ['a', 'b'],
+      aiItemIds: ['b'],
+      rating: { score: 5, verdict: 'v', works: [], fails: [], fixes: [{ removeItemId: 'b', note: 'n' }, { addItemId: 'c', note: 'm' }] },
+    })
+    const after = withoutItem(l, 'b')!
+    expect(after.itemIds).toEqual(['a'])
+    expect(after.aiItemIds).toEqual([])
+    expect(after.rating!.fixes).toEqual([{ addItemId: 'c', note: 'm' }])
+  })
+
+  it('returns null when nothing would be left', async () => {
+    const { withoutItem } = await import('#shared/utils/looks')
+    expect(withoutItem(look('x', '2026-10-01T00:00:00.000Z', { itemIds: ['a'] }), 'a')).toBeNull()
+  })
+
+  it('leaves unrelated looks untouched', async () => {
+    const { withoutItem } = await import('#shared/utils/looks')
+    const l = look('x', '2026-10-01T00:00:00.000Z', { itemIds: ['a'] })
+    expect(withoutItem(l, 'z')).toBe(l)
+  })
+})

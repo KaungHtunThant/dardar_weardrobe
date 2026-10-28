@@ -7,6 +7,7 @@ import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted } from '~/services/lifecycle'
 import { pieces } from '~/services/plural'
 import { canGoBack } from '~/services/navigation'
+import { useItemSheetRoute } from '~/services/shared/itemSheetRoute'
 
 export type WardrobeView = 'closet' | 'list'
 
@@ -39,6 +40,7 @@ export function useWardrobePage() {
   const router = useRouter()
   const wardrobe = useWardrobeStore()
   const isAddOpen = ref(false)
+  const sheet = useItemSheetRoute()
 
   const query = () => route.query as Record<string, string | undefined>
 
@@ -119,5 +121,8 @@ export function useWardrobePage() {
     closeCloset,
     openAdd,
     setAddOpen,
+    openItemId: sheet.openItemId,
+    openItem: sheet.openItem,
+    closeItem: sheet.closeItem,
   }
 }

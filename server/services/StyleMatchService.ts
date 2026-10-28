@@ -8,6 +8,10 @@ export class StyleMatchService {
     return this.looks.findAll()
   }
 
+  async delete(id: string) {
+    if (!(await this.looks.delete(id))) throw new NotFoundError(`Look not found: ${id}`)
+  }
+
   async setFavourite(id: string, isFavourite: boolean) {
     const look = await this.looks.findById(id)
     if (!look) throw new NotFoundError(`Look not found: ${id}`)

@@ -49,14 +49,14 @@ describe('FsImageStore', () => {
 describe('ItemService', () => {
   it('creates a validated item with id and timestamp', async () => {
     const { items } = repos()
-    const service = new ItemService(items, clock)
+    const service = new ItemService(items, repos().looks, new FsImageStore(dir), clock)
     const item = await service.create({ name: ' Beret ', category: 'accessories', originalImage: 'a', cleanImage: 'b' })
     expect(item).toMatchObject({ id: 'item-fixed', name: 'Beret', isFavourite: false, createdAt: '2026-10-28T12:00:00.000Z' })
     expect(await service.list()).toEqual([item])
   })
 
   it('rejects invalid details with a ValidationError', async () => {
-    const service = new ItemService(repos().items, clock)
+    const service = new ItemService(repos().items, repos().looks, new FsImageStore(dir), clock)
     await expect(service.create({ name: '', category: 'tops', originalImage: 'a', cleanImage: 'b' })).rejects.toBeInstanceOf(ValidationError)
     await expect(service.create({ name: 'X', category: 'tops' })).rejects.toBeInstanceOf(ValidationError)
   })

@@ -24,3 +24,11 @@ describe('WardrobePanel service', () => {
     expect(vm.isWorn('item-red-heels')).toBe(true)
   })
 })
+
+describe('WardrobePanel details', () => {
+  it('asks to open a piece in the detail sheet', () => {
+    const emit = vi.fn()
+    useWardrobePanel({ items: seedItems, category: 'all', wornIds: [], wornCategories: [] }, emit).details('item-red-heels')
+    expect(emit).toHaveBeenCalledWith('details', 'item-red-heels')
+  })
+})

@@ -11,7 +11,7 @@ const figureTop = (page: Page) => page.getByTestId('figure').evaluate((el) => el
 
 test('dress the form from the wardrobe panel, Create-A-Sim style', async ({ page }) => {
   await openStudio(page)
-  await expect(page.getByTestId('panel-grid').getByRole('button')).toHaveCount(33)
+  await expect(page.getByTestId('panel-grid').getByRole('button', { name: /^(Wear|Take off) / })).toHaveCount(33)
 
   await page.getByRole('button', { name: 'Wear White Linen Tee' }).click()
   await page.getByRole('button', { name: 'Wear Straight Blue Jeans' }).click()
@@ -32,11 +32,11 @@ test('clicking a piece on the form filters the wardrobe to its category', async 
   await page.getByRole('button', { name: 'Wear Red Pumps' }).click()
   await page.locator('[data-testid="worn-piece"][data-slot="feet"]').click()
   await expect(page.getByRole('tab', { name: 'Shoes' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByTestId('panel-grid').getByRole('button')).toHaveCount(4)
+  await expect(page.getByTestId('panel-grid').getByRole('button', { name: /^(Wear|Take off) / })).toHaveCount(4)
 
   // AI placeholders filter too.
   await page.getByRole('button', { name: /AI picks bags/ }).click()
-  await expect(page.getByTestId('panel-grid').getByRole('button')).toHaveCount(3)
+  await expect(page.getByTestId('panel-grid').getByRole('button', { name: /^(Wear|Take off) / })).toHaveCount(3)
 })
 
 test('zoom in/out and scroll up/down on the dress form', async ({ page }) => {

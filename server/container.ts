@@ -100,7 +100,7 @@ export async function createContainer(options: ContainerOptions) {
   await seed()
 
   return {
-    items: new ItemService(itemRepo, clock),
+    items: new ItemService(itemRepo, lookRepo, images, clock),
     photos: new PhotoService(images, options.processor ?? new PassThroughImageProcessor()),
     looks: new StyleMatchService(lookRepo),
     styling: new StylingService(itemRepo, lookRepo, () => settings.resolveAdvisor(), clock),

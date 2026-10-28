@@ -42,6 +42,11 @@ export class FsImageStore implements ImageStore {
     }
   }
 
+  async delete(ref: string) {
+    const path = this.pathOf(ref)
+    if (path) rmSync(path, { force: true })
+  }
+
   /** Deletes every stored image. */
   async clear() {
     rmSync(this.dir, { recursive: true, force: true })

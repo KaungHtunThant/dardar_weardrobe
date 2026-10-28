@@ -67,6 +67,44 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       for (const id of first!.itemIds) expect(ids.has(id)).toBe(true)
     })
 
+    it('edits a piece: details change, photos and identity stay', async () => {
+      const gw = await fresh()
+      const tee = seedItems.find((i) => i.id === 'item-linen-tee')!
+      const updated = await gw.updateItem(tee.id, { name: '  Linen Shirt ', category: 'outerwear', colors: ['ivory'], brand: '' })
+      expect(updated).toMatchObject({ id: tee.id, name: 'Linen Shirt', category: 'outerwear', colors: ['ivory'], cleanImage: tee.cleanImage, createdAt: tee.createdAt })
+      expect(updated.brand).toBeUndefined()
+      expect((await gw.listItems()).find((i) => i.id === tee.id)!.category).toBe('outerwear')
+      await expect(gw.updateItem(tee.id, { name: '', category: 'tops' })).rejects.toThrow()
+      await expect(gw.updateItem('item-nope', { name: 'X', category: 'tops' })).rejects.toThrow()
+    })
+
+    it("replaces a piece's photo", async () => {
+      const gw = await fresh()
+      const processed = await gw.removeBackground(photo())
+      const updated = await gw.replaceItemPhoto('item-linen-tee', processed)
+      expect(updated.cleanImage).toBe(processed.cleanImage)
+      expect(updated.originalImage).toBe(processed.originalImage)
+    })
+
+    it('deletes a piece and removes it from every look (empty looks go too)', async () => {
+      const gw = await fresh()
+      const solo = await gw.generateLook({ pinnedItemIds: ['item-gold-necklace'] })
+      await gw.deleteItem('item-gold-necklace')
+      expect((await gw.listItems()).some((i) => i.id === 'item-gold-necklace')).toBe(false)
+      const looks = await gw.listStyleMatches()
+      expect(looks.some((l) => l.itemIds.includes('item-gold-necklace'))).toBe(false)
+      expect(looks.some((l) => l.id === solo.id)).toBe(false)
+      expect(looks.find((l) => l.id === 'look-office-chic')!.itemIds).not.toContain('item-gold-necklace')
+      await expect(gw.deleteItem('item-gold-necklace')).rejects.toThrow()
+    })
+
+    it('deletes a look', async () => {
+      const gw = await fresh()
+      await gw.deleteLook('look-date-night')
+      expect((await gw.listStyleMatches()).some((l) => l.id === 'look-date-night')).toBe(false)
+      await expect(gw.deleteLook('look-date-night')).rejects.toThrow()
+    })
+
     it('lists all style matches', async () => {
       const gw = await fresh()
       expect((await gw.listStyleMatches()).length).toBeGreaterThanOrEqual(seedStyleMatches.length)

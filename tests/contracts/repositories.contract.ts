@@ -24,6 +24,18 @@ export function itemRepositoryContract(name: string, make: () => ItemRepository)
       expect((await repo.findAll()).map((i) => i.id).sort()).toEqual(seedItems.map((i) => i.id).sort())
     })
 
+    it('updates and deletes items', async () => {
+      const repo = make()
+      const item = seedItems[0]!
+      await repo.insert(item)
+      await repo.update({ ...item, name: 'Renamed', brand: undefined })
+      const back = await repo.findById(item.id)
+      expect(back!.name).toBe('Renamed')
+      expect(await repo.delete(item.id)).toBe(true)
+      expect(await repo.findById(item.id)).toBeNull()
+      expect(await repo.delete(item.id)).toBe(false)
+    })
+
     it('returns null for an unknown id and rejects duplicate ids', async () => {
       const repo = make()
       expect(await repo.findById('nope')).toBeNull()
@@ -63,6 +75,14 @@ export function styleMatchRepositoryContract(name: string, make: () => StyleMatc
       await repo.insert(rated)
       await repo.update({ ...rated, isFavourite: true })
       expect((await repo.findById('look-rated'))!.isFavourite).toBe(true)
+    })
+
+    it('deletes looks', async () => {
+      const repo = make()
+      await repo.insert(rated)
+      expect(await repo.delete('look-rated')).toBe(true)
+      expect(await repo.findById('look-rated')).toBeNull()
+      expect(await repo.delete('look-rated')).toBe(false)
     })
 
     it('lists everything and returns null for unknown ids', async () => {

@@ -8,6 +8,7 @@ import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted } from '~/services/lifecycle'
+import { useItemSheetRoute } from '~/services/shared/itemSheetRoute'
 
 export type PanelTab = 'wardrobe' | 'verdict'
 
@@ -57,6 +58,7 @@ export function useStudioPage() {
   const wardrobe = useWardrobeStore()
   const looks = useStyleMatchesStore()
   const settings = useSettingsStore()
+  const sheet = useItemSheetRoute()
 
   const outfitIds = ref<string[]>([])
   const aiIds = ref<string[]>([])
@@ -224,5 +226,8 @@ export function useStudioPage() {
     applyFix,
     toggleFavourite,
     clearOutfit,
+    openItemId: sheet.openItemId,
+    openItem: sheet.openItem,
+    closeItem: sheet.closeItem,
   }
 }

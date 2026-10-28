@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWardrobeStore } from '~/stores/wardrobe'
+import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { setupTestGateway } from '../helpers'
 
 describe('wardrobe store', () => {
@@ -46,5 +47,28 @@ describe('wardrobe store', () => {
     await store.load()
     expect(store.error).toBe('boom')
     expect(store.loaded).toBe(false)
+  })
+
+  it('edits a piece in place', async () => {
+    const store = useWardrobeStore()
+    await store.load()
+    await store.updateItem('item-linen-tee', { name: 'Linen Shirt', category: 'outerwear' })
+    expect(store.byCategory('outerwear').some((i) => i.name === 'Linen Shirt')).toBe(true)
+  })
+
+  it('deletes a piece and refreshes looks that contained it', async () => {
+    const store = useWardrobeStore()
+    const looks = useStyleMatchesStore()
+    await Promise.all([store.load(), looks.load()])
+    await store.deleteItem('item-gold-necklace')
+    expect(store.items.some((i) => i.id === 'item-gold-necklace')).toBe(false)
+    expect(looks.looks.some((l) => l.itemIds.includes('item-gold-necklace'))).toBe(false)
+  })
+
+  it("replaces a piece's photo", async () => {
+    const store = useWardrobeStore()
+    await store.load()
+    await store.replaceItemPhoto('item-linen-tee', { originalImage: 'o', cleanImage: 'c' })
+    expect(store.items.find((i) => i.id === 'item-linen-tee')!.cleanImage).toBe('c')
   })
 })

@@ -74,6 +74,7 @@ const vm = useStudioPage()
         :worn-categories="vm.wornCategories.value"
         @select-category="vm.selectPanelCategory"
         @toggle="vm.toggleWear"
+        @details="vm.openItem"
       />
 
       <div v-else class="min-h-0 flex-1 overflow-y-auto p-4">
@@ -134,5 +135,6 @@ const vm = useStudioPage()
         </p>
       </div>
     </aside>
+    <ItemDetailSheet :item-id="vm.openItemId.value" @close="vm.closeItem" />
   </div>
 </template>

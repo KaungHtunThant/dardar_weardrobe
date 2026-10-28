@@ -17,6 +17,10 @@ export type CreateItemInput = ItemDetailsInput & ProcessedPhoto
 export interface ItemGateway {
   listItems(): Promise<Item[]>
   createItem(input: CreateItemInput): Promise<Item>
+  updateItem(id: string, details: ItemDetailsInput): Promise<Item>
+  replaceItemPhoto(id: string, photo: ProcessedPhoto): Promise<Item>
+  /** Also removes the piece from every look; looks left empty are deleted. */
+  deleteItem(id: string): Promise<void>
   /** AI pre-fill for the add-item form, from the clean image; may be empty. */
   suggestDetails(cleanImage: string): Promise<DetailsSuggestion>
 }
@@ -31,6 +35,7 @@ export interface StyleMatchGateway {
   /** Today's recommendation for a YYYY-MM-DD date (null with an empty wardrobe). */
   getTodayLook(date: string): Promise<StyleMatch | null>
   setFavourite(id: string, isFavourite: boolean): Promise<StyleMatch>
+  deleteLook(id: string): Promise<void>
 }
 
 export interface StylingGateway {

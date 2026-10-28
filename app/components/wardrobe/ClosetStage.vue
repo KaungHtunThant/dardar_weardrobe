@@ -4,7 +4,7 @@ import type { Item } from '#shared/models/item'
 import { useClosetStage } from '~/services/components/wardrobe/ClosetStage.service'
 
 const props = defineProps<{ category: CategoryId; items: Item[] }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; 'open-item': [id: string] }>()
 const vm = useClosetStage(props, emit)
 </script>
 
@@ -27,7 +27,7 @@ const vm = useClosetStage(props, emit)
         class="absolute inset-0 transition-[opacity,transform] delay-150 duration-700 ease-soft"
         :class="vm.doorsOpen.value ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-0'"
       >
-        <WardrobeClothesRail v-if="items.length" :items="items" :category="category" />
+        <WardrobeClothesRail v-if="items.length" :items="items" :category="category" @open="$emit('open-item', $event)" />
         <div v-else class="grid h-full place-items-center text-center">
           <div>
             <p class="font-display text-2xl text-ink">This closet is empty</p>

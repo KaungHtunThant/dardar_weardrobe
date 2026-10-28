@@ -78,6 +78,18 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     }
   }
 
+  /** Fetches the looks again (e.g. after a piece was deleted). */
+  function reload() {
+    loaded.value = false
+    return load()
+  }
+
+  async function deleteLook(id: string) {
+    await useGateway().deleteLook(id)
+    looks.value = looks.value.filter((l) => l.id !== id)
+    if (todayId.value === id) todayId.value = null
+  }
+
   /** After the wardrobe is cleared: no looks, no daily pick. */
   function forget() {
     looks.value = []
@@ -116,6 +128,8 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     load,
     toggleFavourite,
     loadToday,
+    reload,
+    deleteLook,
     forget,
     generate,
   }

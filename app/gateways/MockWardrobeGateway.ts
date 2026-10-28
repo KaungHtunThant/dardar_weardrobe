@@ -1,11 +1,11 @@
 import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
 import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/contracts/WardrobeGateway'
-import { ItemDetailsSchema, type Item } from '#shared/models/item'
+import { ItemDetailsSchema, type Item, type ItemDetailsInput } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
 import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type Settings, type SettingsUpdate, type SettingsView } from '#shared/models/settings'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
-import { lookFromSuggestion, todaysPick } from '#shared/utils/looks'
+import { lookFromSuggestion, todaysPick, withoutItem } from '#shared/utils/looks'
 import type { SnapshotStore, WardrobeSnapshot } from './persistence/SnapshotStore'
 
 export interface MockGatewayOptions {
@@ -87,6 +87,47 @@ export class MockWardrobeGateway implements WardrobeGateway {
     await this.persist()
     await this.wait()
     return structuredClone(item)
+  }
+
+  private async item(id: string) {
+    const item = (await this.data()).items.find((i) => i.id === id)
+    if (!item) throw new Error(`Piece not found: ${id}`)
+    return item
+  }
+
+  async updateItem(id: string, details: ItemDetailsInput) {
+    const item = await this.item(id)
+    const parsed = ItemDetailsSchema.parse(details)
+    // Optional fields left blank in the edit are removed, not kept from before.
+    delete item.brand
+    delete item.size
+    delete item.notes
+    Object.assign(item, parsed)
+    await this.persist()
+    return structuredClone(item)
+  }
+
+  async replaceItemPhoto(id: string, photo: ProcessedPhoto) {
+    const item = await this.item(id)
+    item.originalImage = photo.originalImage
+    item.cleanImage = photo.cleanImage
+    await this.persist()
+    return structuredClone(item)
+  }
+
+  async deleteItem(id: string) {
+    await this.item(id)
+    const data = await this.data()
+    data.items = data.items.filter((i) => i.id !== id)
+    data.styleMatches = data.styleMatches.flatMap((l) => withoutItem(l, id) ?? [])
+    await this.persist()
+  }
+
+  async deleteLook(id: string) {
+    const data = await this.data()
+    if (!data.styleMatches.some((l) => l.id === id)) throw new Error(`Look not found: ${id}`)
+    data.styleMatches = data.styleMatches.filter((l) => l.id !== id)
+    await this.persist()
   }
 
   /** Prototype: no vision, so nothing to suggest. */

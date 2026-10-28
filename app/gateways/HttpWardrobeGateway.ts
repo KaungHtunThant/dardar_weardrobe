@@ -1,6 +1,6 @@
 import { ofetch, type $Fetch } from 'ofetch'
 import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/contracts/WardrobeGateway'
-import type { Item } from '#shared/models/item'
+import type { Item, ItemDetailsInput } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
@@ -30,6 +30,23 @@ export class HttpWardrobeGateway implements WardrobeGateway {
 
   createItem(input: CreateItemInput) {
     return this.call(() => this.api<Item>('/api/items', { method: 'POST', body: input }))
+  }
+
+  updateItem(id: string, details: ItemDetailsInput) {
+    return this.call(() => this.api<Item>(`/api/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: details }))
+  }
+
+  replaceItemPhoto(id: string, photo: ProcessedPhoto) {
+    const { originalImage, cleanImage } = photo
+    return this.call(() => this.api<Item>(`/api/items/${encodeURIComponent(id)}/photo`, { method: 'PUT', body: { originalImage, cleanImage } }))
+  }
+
+  async deleteItem(id: string) {
+    await this.call(() => this.api(`/api/items/${encodeURIComponent(id)}`, { method: 'DELETE' }))
+  }
+
+  async deleteLook(id: string) {
+    await this.call(() => this.api(`/api/looks/${encodeURIComponent(id)}`, { method: 'DELETE' }))
   }
 
   suggestDetails(cleanImage: string) {

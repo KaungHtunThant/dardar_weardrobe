@@ -72,4 +72,32 @@ describe('API', () => {
     expect(await ofetch(`${api.baseURL}/api/looks/today`, { query: { date: '2026-10-28' } })).toEqual({ look: null })
     expect(await ofetch(`${api.baseURL}/api/items`)).toEqual([])
   })
+
+  it('deleting a piece deletes its uploaded photos but never the demo images', async () => {
+    api = await startApi(seed())
+    const form = new FormData()
+    form.append('photo', new Blob([PNG], { type: 'image/png' }), 'tee.png')
+    const photo = await ofetch(`${api.baseURL}/api/photos`, { method: 'POST', body: form })
+    const item = await ofetch(`${api.baseURL}/api/items`, { method: 'POST', body: { name: 'Tee', category: 'tops', ...photo } })
+    await ofetch(`${api.baseURL}/api/items/${item.id}`, { method: 'DELETE' })
+    expect((await fetch(`${api.baseURL}${photo.cleanImage}`)).status).toBe(404)
+    expect((await fetch(`${api.baseURL}${photo.originalImage}`)).status).toBe(404)
+    await ofetch(`${api.baseURL}/api/items/item-linen-tee`, { method: 'DELETE' })
+    expect(await status(ofetch(`${api.baseURL}/api/items/item-linen-tee`, { method: 'DELETE' }))).toBe(404)
+  })
+
+  it('replacing a photo deletes the old uploaded files', async () => {
+    api = await startApi(seed())
+    const upload = async () => {
+      const form = new FormData()
+      form.append('photo', new Blob([PNG], { type: 'image/png' }), 'p.png')
+      return ofetch(`${api.baseURL}/api/photos`, { method: 'POST', body: form })
+    }
+    const first = await upload()
+    const item = await ofetch(`${api.baseURL}/api/items`, { method: 'POST', body: { name: 'Tee', category: 'tops', ...first } })
+    const second = await upload()
+    await ofetch(`${api.baseURL}/api/items/${item.id}/photo`, { method: 'PUT', body: second })
+    expect((await fetch(`${api.baseURL}${first.cleanImage}`)).status).toBe(404)
+    expect((await fetch(`${api.baseURL}${second.cleanImage}`)).status).toBe(200)
+  })
 })

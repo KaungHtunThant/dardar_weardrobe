@@ -31,6 +31,24 @@ export function resolveLookItems(look: StyleMatch, items: readonly Item[]): Item
   return look.itemIds.flatMap((id) => byId.get(id) ?? [])
 }
 
+/**
+ * A look after one of its pieces was deleted: the piece, its AI badge and any fix mentioning it go.
+ * Returns null when nothing would be left, and the same object when the look didn't contain it.
+ */
+export function withoutItem(look: StyleMatch, itemId: string): StyleMatch | null {
+  if (!look.itemIds.includes(itemId)) return look
+  const itemIds = look.itemIds.filter((id) => id !== itemId)
+  if (itemIds.length === 0) return null
+  return {
+    ...look,
+    itemIds,
+    ...(look.aiItemIds ? { aiItemIds: look.aiItemIds.filter((id) => id !== itemId) } : {}),
+    ...(look.rating
+      ? { rating: { ...look.rating, fixes: look.rating.fixes.filter((f) => f.addItemId !== itemId && f.removeItemId !== itemId) } }
+      : {}),
+  }
+}
+
 /** The saved look for an advisor's suggestion (used by every gateway/back end that generates looks). */
 export function lookFromSuggestion(
   suggestion: StyleSuggestion,

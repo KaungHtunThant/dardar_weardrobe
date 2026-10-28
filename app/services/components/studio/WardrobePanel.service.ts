@@ -6,6 +6,8 @@ import type { CategoryFilter } from '#shared/utils/wardrobe'
 interface Emit {
   (event: 'select-category', id: CategoryFilter): void
   (event: 'toggle', id: string): void
+  // eslint-disable-next-line @typescript-eslint/unified-signatures -- must mirror defineEmits' separate overloads
+  (event: 'details', id: string): void
 }
 
 export function useWardrobePanel(
@@ -25,9 +27,13 @@ export function useWardrobePanel(
     emit('toggle', id)
   }
 
+  function details(id: string) {
+    emit('details', id)
+  }
+
   function isWorn(id: string) {
     return props.wornIds.includes(id)
   }
 
-  return { tabs, select, toggle, isWorn }
+  return { tabs, select, toggle, details, isWorn }
 }

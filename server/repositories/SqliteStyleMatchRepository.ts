@@ -37,6 +37,12 @@ export class SqliteStyleMatchRepository implements StyleMatchRepository {
     return look
   }
 
+  async delete(id: string) {
+    const existed = (await this.findById(id)) !== null
+    if (existed) await this.db.delete(styleMatches).where(eq(styleMatches.id, id))
+    return existed
+  }
+
   async update(look: StyleMatch) {
     const { id, ...rest } = toRow(look)
     await this.db.update(styleMatches).set(rest).where(eq(styleMatches.id, id))

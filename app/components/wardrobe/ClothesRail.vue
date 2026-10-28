@@ -4,6 +4,7 @@ import type { Item } from '#shared/models/item'
 import { useClothesRail } from '~/services/components/wardrobe/ClothesRail.service'
 
 const props = defineProps<{ items: Item[]; category: CategoryId }>()
+defineEmits<{ open: [id: string] }>()
 const vm = useClothesRail(props)
 // Template ref for the carousel viewport (owned by the service).
 const emblaRef = vm.emblaRef
@@ -40,6 +41,7 @@ const emblaRef = vm.emblaRef
           data-testid="rail-item"
         >
           <WardrobeHanger v-if="vm.storage.value === 'hang'" class="-mb-1 shrink-0" />
+          <button type="button" class="contents" :aria-label="`Open ${item.name}`" @click="$emit('open', item.id)">
           <img
             :src="item.cleanImage"
             :alt="item.name"
@@ -47,6 +49,7 @@ const emblaRef = vm.emblaRef
             :class="vm.storage.value === 'hang' ? 'max-h-[min(56vh,460px)] w-[250px]' : 'max-h-[min(32vh,260px)] w-[210px]'"
             draggable="false"
           >
+          </button>
           <p
             class="max-w-[200px] truncate text-center text-xs tracking-wide text-taupe"
             :class="vm.storage.value === 'hang' ? 'mt-3' : 'absolute bottom-[56px]'"
