@@ -22,3 +22,32 @@ test('choose the stylist; the Studio shows who styles', async ({ page }) => {
   await page.getByRole('button', { name: 'Save settings' }).click()
   await expect(page.getByRole('status')).toHaveText('Saved')
 })
+
+test('start fresh: clearing the wardrobe empties every page but keeps settings', async ({ page }) => {
+  const nav = page.getByRole('navigation', { name: 'Main' })
+  await nav.getByRole('link', { name: 'Settings' }).click()
+
+  // Cancelling keeps everything.
+  await page.getByRole('button', { name: 'Clear wardrobe…' }).click()
+  await page.getByRole('button', { name: 'Keep my wardrobe' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  await page.getByRole('button', { name: 'Clear wardrobe…' }).click()
+  await expect(page.getByRole('dialog', { name: 'Clear your wardrobe?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Delete everything' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByRole('status')).toContainText('fresh')
+
+  await nav.getByRole('link', { name: 'Wardrobe' }).click()
+  await expect(page.locator('main header').getByText('0 pieces')).toBeVisible()
+  await expect(page.getByTestId('closet-tile').first()).toContainText('0 pieces')
+  await nav.getByRole('link', { name: 'Home' }).click()
+  await expect(page.getByText('No recommendation yet')).toBeVisible()
+  await expect(page.getByText('No favourites yet')).toBeVisible()
+
+  // Still empty after a reload (nothing comes back from the server).
+  await page.reload()
+  await expect(page.getByText('No recommendation yet')).toBeVisible()
+  await nav.getByRole('link', { name: 'Settings' }).click()
+  await expect(page.getByRole('radio', { name: /Offline/ })).toHaveAttribute('aria-checked', 'true')
+})

@@ -43,5 +43,10 @@ export interface SettingsGateway {
   updateSettings(update: SettingsUpdate): Promise<SettingsView>
 }
 
+export interface DataGateway {
+  /** Deletes every item, photo and look so the user can start fresh. Settings and the API key stay. */
+  clearWardrobe(): Promise<void>
+}
+
 /** Everything the frontend needs from the outside world. Stores depend on this, never on an implementation. */
-export interface WardrobeGateway extends ItemGateway, PhotoGateway, StyleMatchGateway, StylingGateway, SettingsGateway {}
+export interface WardrobeGateway extends ItemGateway, PhotoGateway, StyleMatchGateway, StylingGateway, SettingsGateway, DataGateway {}

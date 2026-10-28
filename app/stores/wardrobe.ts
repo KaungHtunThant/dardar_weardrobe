@@ -47,11 +47,18 @@ export const useWardrobeStore = defineStore('wardrobe', () => {
     return useGateway().suggestDetails(cleanImage)
   }
 
+  /** Deletes everything on the backend and empties this store. */
+  async function clearAll() {
+    await useGateway().clearWardrobe()
+    raw.value = []
+    loaded.value = true
+  }
+
   async function addItem(input: CreateItemInput) {
     const item = await useGateway().createItem(input)
     raw.value = [...raw.value, item]
     return item
   }
 
-  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, suggestDetails, addItem }
+  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, suggestDetails, addItem, clearAll }
 })

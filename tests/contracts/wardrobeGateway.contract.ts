@@ -112,6 +112,18 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       expect((await gw.updateSettings({ apiKey: null })).apiKey.present).toBe(false)
     })
 
+    it('clears the whole wardrobe but keeps the settings', async () => {
+      const gw = await fresh()
+      await gw.updateSettings({ advisor: 'offline', model: 'claude-haiku-5-5' })
+      const { cleanImage, originalImage } = await gw.removeBackground(photo())
+      await gw.createItem({ name: 'Beret', category: 'accessories', cleanImage, originalImage })
+      await gw.clearWardrobe()
+      expect(await gw.listItems()).toEqual([])
+      expect(await gw.listStyleMatches()).toEqual([])
+      expect(await gw.getTodayLook('2026-10-28')).toBeNull()
+      expect((await gw.getSettings()).model).toBe('claude-haiku-5-5')
+    })
+
     it('rejects invalid settings', async () => {
       const gw = await fresh()
       await expect(gw.updateSettings({ advisor: 'gpt' as never })).rejects.toThrow()

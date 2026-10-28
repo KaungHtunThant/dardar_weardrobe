@@ -150,4 +150,11 @@ export class MockWardrobeGateway implements WardrobeGateway {
     this.settings = SettingsSchema.parse({ ...this.settings, ...changes })
     return this.settingsView()
   }
+
+  async clearWardrobe() {
+    const data = await this.data()
+    data.items = []
+    data.styleMatches = []
+    await this.persist()
+  }
 }

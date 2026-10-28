@@ -78,6 +78,13 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     }
   }
 
+  /** After the wardrobe is cleared: no looks, no daily pick. */
+  function forget() {
+    looks.value = []
+    loaded.value = true
+    todayId.value = null
+  }
+
   async function generate(request: StyleRequestInput): Promise<StyleMatch | null> {
     generating.value = true
     generateError.value = null
@@ -109,6 +116,7 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     load,
     toggleFavourite,
     loadToday,
+    forget,
     generate,
   }
 })

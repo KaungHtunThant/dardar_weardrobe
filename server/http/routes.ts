@@ -5,6 +5,7 @@ import { ItemController } from '../controllers/ItemController'
 import { LookController } from '../controllers/LookController'
 import { PhotoController } from '../controllers/PhotoController'
 import { SettingsController } from '../controllers/SettingsController'
+import { WardrobeController } from '../controllers/WardrobeController'
 import { toHttpError } from './errors'
 
 const handle = (fn: (event: H3Event) => unknown) =>
@@ -26,6 +27,7 @@ export function createApiRouter(c: Container) {
   const images = new ImageController(c.images)
   const looks = new LookController(c.looks, c.styling, c.today)
   const settings = new SettingsController(c.settings)
+  const wardrobe = new WardrobeController(() => c.clearWardrobe())
 
   const router = createRouter({ preemptive: true })
     .get('/api/items', handle(() => items.list()))
@@ -39,6 +41,7 @@ export function createApiRouter(c: Container) {
     .post('/api/looks/generate', handle((e) => looks.generate(e)))
     .get('/api/settings', handle(() => settings.show()))
     .put('/api/settings', handle((e) => settings.update(e)))
+    .post('/api/wardrobe/clear', handle((e) => wardrobe.clear(e)))
 
   if (c.allowReset) router.post('/api/dev/reset', handle(async () => ({ reset: await c.reset() })))
   return router

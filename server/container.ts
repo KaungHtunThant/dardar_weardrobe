@@ -1,3 +1,4 @@
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ImageProcessor } from '#shared/contracts/ImageProcessor'
@@ -91,8 +92,10 @@ export async function createContainer(options: ContainerOptions) {
     defaultAdvisor: options.defaultAdvisor ?? 'auto',
   })
 
+  // After the user clears their wardrobe, demo data must not come back on the next start.
+  const clearedMarker = join(dataDir, 'wardrobe-cleared')
   async function seed() {
-    return options.seed ? seedIfEmpty(itemRepo, lookRepo, options.seed) : false
+    return options.seed && !existsSync(clearedMarker) ? seedIfEmpty(itemRepo, lookRepo, options.seed) : false
   }
   await seed()
 
@@ -106,9 +109,17 @@ export async function createContainer(options: ContainerOptions) {
     today: new TodayService(itemRepo, lookRepo, () => settings.resolveAdvisor(), new RuleBasedStyleAdvisor(), clock),
     images,
     allowReset: options.allowReset ?? false,
+    /** The user's "start fresh": every item, look and photo goes; settings and the API key stay. */
+    async clearWardrobe() {
+      database.clear()
+      await images.clear()
+      writeFileSync(clearedMarker, new Date().toISOString())
+    },
+    /** Test-only: back to the demo seed with default settings. */
     async reset() {
       database.clear()
       settingsStore.clear()
+      rmSync(clearedMarker, { force: true })
       return seed()
     },
     close: database.close,

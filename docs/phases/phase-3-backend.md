@@ -42,6 +42,7 @@ server/
 | GET | `/api/looks` | List style matches |
 | PUT | `/api/looks/:id/favourite` | Set `isFavourite` |
 | POST | `/api/looks/generate` | Studio: complete and rate a look, and save it |
+| POST | `/api/wardrobe/clear` | Start fresh: delete every item, look and photo (body `{ confirm: true }`); settings are kept |
 | POST | `/api/dev/reset` | Test-only reset to the seed data |
 
 ## Test plan (TDD)

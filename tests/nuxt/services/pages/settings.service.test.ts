@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useSettingsPage } from '~/services/pages/settings.service'
+import { useStyleMatchesStore } from '~/stores/styleMatches'
+import { useWardrobeStore } from '~/stores/wardrobe'
 import { setupTestGateway } from '../../helpers'
 
 async function ready() {
@@ -56,5 +58,28 @@ describe('settings page service', () => {
   it('explains where the key is kept', async () => {
     const vm = await ready()
     expect(vm.keyStorageNote.value).toMatch(/private file/)
+  })
+
+  it('clears the wardrobe only after confirmation, keeping the settings', async () => {
+    const vm = await ready()
+    const wardrobe = useWardrobeStore()
+    const looks = useStyleMatchesStore()
+    await Promise.all([wardrobe.load(), looks.load()])
+    vm.form.model = 'claude-haiku-5-5'
+    await vm.save()
+
+    vm.askClear()
+    expect(vm.clearOpen.value).toBe(true)
+    vm.setClearOpen(false)
+    expect(wardrobe.items.length).toBeGreaterThan(0)
+
+    vm.askClear()
+    await vm.confirmClear()
+    expect(vm.clearOpen.value).toBe(false)
+    expect(wardrobe.items).toEqual([])
+    expect(looks.looks).toEqual([])
+    expect(looks.todayLook).toBeNull()
+    expect(vm.savedMessage.value).toMatch(/fresh/i)
+    expect(vm.view.value?.model).toBe('claude-haiku-5-5')
   })
 })

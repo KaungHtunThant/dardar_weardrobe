@@ -67,4 +67,8 @@ export class HttpWardrobeGateway implements WardrobeGateway {
   updateSettings(update: SettingsUpdate) {
     return this.call(() => this.api<SettingsView>('/api/settings', { method: 'PUT', body: update }))
   }
+
+  async clearWardrobe() {
+    await this.call(() => this.api('/api/wardrobe/clear', { method: 'POST', body: { confirm: true } }))
+  }
 }

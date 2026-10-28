@@ -70,6 +70,19 @@ Claude can understand images but cannot create or edit them. Background removal 
   - If the chosen stylist fails, it uses the offline rules.
   - Home shows a "styling today's look" placeholder while it works.
 
+## Added after Phase 4: Start fresh
+- **Settings → Start fresh → "Clear wardrobe…"** opens a small confirmation dialog ("Keep my wardrobe" / "Delete everything").
+- **What it deletes:** every item, look and stored photo, through `POST /api/wardrobe/clear`, which requires `{ confirm: true }`.
+- **What it keeps:** the stylist settings and the API key.
+- **A `wardrobe-cleared` marker** in the data folder stops the demo seed from coming back on the next start.
+- The page stores empty themselves straight away (`wardrobe.clearAll()`, `styleMatches.forget()`).
+- **Tests:**
+  - the gateway contract (mock and HTTP);
+  - the API: photos deleted, confirmation required;
+  - a restart with the data kept empty;
+  - the Settings service;
+  - an e2e flow: cancel, then clear, then empty Home and Wardrobe, then reload, with settings kept.
+
 ## Tests
 - Contract suites:
   - StyleAdvisor: rule-based, CLI (fake process), API (fake client).

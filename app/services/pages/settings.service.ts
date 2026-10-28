@@ -1,6 +1,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { DEFAULT_MODEL, type AdvisorMode, type Settings } from '#shared/models/settings'
 import { useSettingsStore } from '~/stores/settings'
+import { useStyleMatchesStore } from '~/stores/styleMatches'
+import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted } from '~/services/lifecycle'
 
 export interface ModeOption {
@@ -30,6 +32,9 @@ export function useSettingsPage() {
   const form = reactive<Settings>({ advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium' })
   const apiKeyInput = ref('')
   const savedMessage = ref<string | null>(null)
+  const clearOpen = ref(false)
+  const clearing = ref(false)
+  const clearError = ref<string | null>(null)
 
   function syncForm() {
     if (!store.view) return
@@ -121,6 +126,31 @@ export function useSettingsPage() {
     form.effort = value as Effort
   }
 
+  function askClear() {
+    clearError.value = null
+    clearOpen.value = true
+  }
+
+  function setClearOpen(open: boolean) {
+    if (!clearing.value) clearOpen.value = open
+  }
+
+  /** Start fresh: every piece, photo and look is deleted; settings and the API key stay. */
+  async function confirmClear() {
+    clearing.value = true
+    clearError.value = null
+    try {
+      await useWardrobeStore().clearAll()
+      useStyleMatchesStore().forget()
+      clearOpen.value = false
+      flash('Your wardrobe is fresh and empty.')
+    } catch (e) {
+      clearError.value = e instanceof Error ? e.message : String(e)
+    } finally {
+      clearing.value = false
+    }
+  }
+
   async function init() {
     await store.load()
     syncForm()
@@ -147,5 +177,11 @@ export function useSettingsPage() {
     setEffort,
     save,
     removeKey,
+    clearOpen,
+    clearing,
+    clearError,
+    askClear,
+    setClearOpen,
+    confirmClear,
   }
 }

@@ -102,5 +102,42 @@ const vm = useSettingsPage()
       </button>
       <p v-if="vm.savedMessage.value" role="status" class="text-sm text-taupe">{{ vm.savedMessage.value }}</p>
     </div>
+
+    <section aria-labelledby="fresh-title" class="mt-16 border-t border-line/70 pt-10">
+      <h2 id="fresh-title" class="font-display text-2xl text-ink">Start fresh</h2>
+      <p class="mt-1 max-w-xl text-sm text-taupe">
+        Delete every piece, photo and look from this computer and begin with an empty wardrobe. Your stylist settings and API key are kept.
+      </p>
+      <button
+        type="button"
+        class="mt-4 h-11 rounded-full border border-rose/60 px-6 text-sm text-rose transition-colors hover:bg-blush-soft"
+        @click="vm.askClear"
+      >
+        Clear wardrobe…
+      </button>
+    </section>
+
+    <UiDialog
+      :open="vm.clearOpen.value"
+      size="sm"
+      title="Clear your wardrobe?"
+      description="This permanently deletes every piece, photo and look. It can't be undone."
+      @update:open="vm.setClearOpen"
+    >
+      <p v-if="vm.clearError.value" role="alert" class="mb-4 rounded-xl bg-blush-soft px-4 py-3 text-sm text-rose">{{ vm.clearError.value }}</p>
+      <div class="flex justify-end gap-3">
+        <button type="button" class="h-11 rounded-full px-6 text-sm text-taupe transition-colors hover:text-ink" @click="vm.setClearOpen(false)">
+          Keep my wardrobe
+        </button>
+        <button
+          type="button"
+          :disabled="vm.clearing.value"
+          class="h-11 rounded-full bg-rose px-6 text-sm font-medium text-white transition-colors hover:bg-[#ad6b72] disabled:opacity-60"
+          @click="vm.confirmClear"
+        >
+          {{ vm.clearing.value ? 'Deleting…' : 'Delete everything' }}
+        </button>
+      </div>
+    </UiDialog>
   </div>
 </template>

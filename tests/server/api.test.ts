@@ -54,4 +54,22 @@ describe('API', () => {
     await ofetch(`${api.baseURL}/api/dev/reset`, { method: 'POST' })
     expect(await ofetch(`${api.baseURL}/api/looks`)).toHaveLength(seedStyleMatches.length)
   })
+
+  it('clearing the wardrobe deletes stored photos too, and needs confirmation', async () => {
+    api = await startApi(seed())
+    const form = new FormData()
+    form.append('photo', new Blob([PNG], { type: 'image/png' }), 'tee.png')
+    const photo = await ofetch(`${api.baseURL}/api/photos`, { method: 'POST', body: form })
+    expect(await status(ofetch(`${api.baseURL}/api/wardrobe/clear`, { method: 'POST', body: {} }))).toBe(400)
+    await ofetch(`${api.baseURL}/api/wardrobe/clear`, { method: 'POST', body: { confirm: true } })
+    expect((await fetch(`${api.baseURL}${photo.cleanImage}`)).status).toBe(404)
+    expect(await ofetch(`${api.baseURL}/api/items`)).toEqual([])
+  })
+
+  it('does not bring the demo data back after clearing', async () => {
+    api = await startApi(seed())
+    await ofetch(`${api.baseURL}/api/wardrobe/clear`, { method: 'POST', body: { confirm: true } })
+    expect(await ofetch(`${api.baseURL}/api/looks/today`, { query: { date: '2026-10-28' } })).toEqual({ look: null })
+    expect(await ofetch(`${api.baseURL}/api/items`)).toEqual([])
+  })
 })

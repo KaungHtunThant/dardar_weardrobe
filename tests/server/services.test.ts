@@ -136,3 +136,34 @@ describe('StylingService with nothing to style', () => {
     expect(await r.looks.findAll()).toHaveLength(0)
   })
 })
+
+describe('FsImageStore.clear', () => {
+  it('removes every stored image', async () => {
+    const store = new FsImageStore(dir)
+    const ref = await store.save(PNG, 'image/png')
+    await store.clear()
+    expect(await store.read(ref)).toBeNull()
+    expect(await store.read(await store.save(PNG, 'image/png'))).not.toBeNull()
+  })
+})
+
+describe('clearWardrobe across restarts', () => {
+  it('keeps the wardrobe empty when the app starts again', async () => {
+    const { createContainer } = await import('../../server/container')
+    const options = {
+      databasePath: join(dir, 'dardar.db'),
+      imagesDir: join(dir, 'images'),
+      seed: { items: seedItems, styleMatches: seedStyleMatches },
+      runner: async () => Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+      envApiKey: () => null,
+      defaultAdvisor: 'offline' as const,
+    }
+    const first = await createContainer(options)
+    expect(await first.items.list()).toHaveLength(seedItems.length)
+    await first.clearWardrobe()
+    first.close()
+    const second = await createContainer(options)
+    expect(await second.items.list()).toEqual([])
+    second.close()
+  })
+})

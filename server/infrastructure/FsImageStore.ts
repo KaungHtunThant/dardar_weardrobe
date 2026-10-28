@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ImageStore, StoredImage } from '#shared/contracts/ImageStore'
@@ -40,6 +40,12 @@ export class FsImageStore implements ImageStore {
     } catch {
       return null
     }
+  }
+
+  /** Deletes every stored image. */
+  async clear() {
+    rmSync(this.dir, { recursive: true, force: true })
+    mkdirSync(this.dir, { recursive: true })
   }
 
   /** Absolute path of a stored image (for local tools such as the Claude CLI). */
