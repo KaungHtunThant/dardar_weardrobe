@@ -13,10 +13,11 @@ export const test = base.extend<{ app: ElectronApplication; page: Page }>({
   },
   page: async ({ app }, use) => {
     const page = await app.firstWindow()
-    await page.waitForLoadState('domcontentloaded')
+    await page.waitForLoadState('networkidle')
     // Each test starts from fresh seed data.
     await page.evaluate(() => indexedDB.deleteDatabase('dardar-wardrobe'))
     await page.reload()
+    await page.waitForLoadState('networkidle')
     await use(page)
   },
 })

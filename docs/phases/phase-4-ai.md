@@ -20,10 +20,10 @@ Claude still does the vision work:
 
 ## Scope
 - **`ImageProcessor`:** an imgly implementation, used by the photo-upload route from Phase 3.
-- **`StyleAdvisor`** (`shared/contracts/StyleAdvisor.ts`, `suggestLook({ wardrobe, prompt? })`) with two providers:
+- **`StyleAdvisor`** (`shared/contracts/StyleAdvisor.ts`, `suggestLook({ wardrobe, pinnedItemIds, fillCategories, prompt? })`) with two providers. Both replace the prototype's `MockStyleAdvisor`, must pass `tests/contracts/styleAdvisor.contract.ts`, and return a **brutally honest rating**: a 1–10 score, a verdict, what works, what doesn't, and fixes from the user's own wardrobe.
   - **`ClaudeCliProvider`:** spawns `claude -p --output-format stream-json` and passes the item details and the clean-image file paths. It detects whether `claude` is on the PATH.
   - **`ClaudeApiProvider`:** uses `@anthropic-ai/sdk` with vision and streaming. The model is configurable and defaults to the latest Claude model.
-  - Both return a `StyleMatch`, as structured JSON validated by zod. Any id that isn't in the wardrobe is rejected.
+  - Both return structured JSON validated by zod (`StyleSuggestion`, including the `StyleRating`). Any id that isn't in the wardrobe is rejected. The system prompt tells the model to be blunt and specific: no flattery.
 - **Settings:**
   - Choose CLI or API mode, and the model.
   - The API key is encrypted with Electron `safeStorage` and passed to Nitro through the environment.

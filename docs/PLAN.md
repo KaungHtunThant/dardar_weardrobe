@@ -4,6 +4,7 @@
 > Changes from this plan made during implementation:
 > - shadcn-nuxt was replaced by **reka-ui** used directly, with a few in-house primitives in `app/components/ui/`.
 > - The add-item component is `app/components/item/AddDialog.vue`, because of Nuxt component naming.
+> - **Added: Style Studio (`/studio`).** You pick pieces (optional) and toggle which categories the AI fills, add an optional prompt, then generate. The AI completes the look and rates it with brutal honesty (score, verdict, what works, what doesn't, wardrobe fixes you can apply). This replaces the planned "style-match request screen". See `phases/phase-2-ui-prototype.md`.
 
 # Dardar Wardrobe: tech stack and phased plan
 

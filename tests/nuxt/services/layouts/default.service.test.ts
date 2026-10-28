@@ -6,9 +6,9 @@ const route = { path: '/wardrobe' }
 mockNuxtImport('useRoute', () => () => route)
 
 describe('default layout service', () => {
-  it('lists Home and Wardrobe', () => {
+  it('lists Home, Studio and Wardrobe', () => {
     const vm = useDefaultLayout()
-    expect(vm.navItems.map((n) => n.label)).toEqual(['Home', 'Wardrobe'])
+    expect(vm.navItems.map((n) => n.label)).toEqual(['Home', 'Studio', 'Wardrobe'])
   })
 
   it('marks the current section active, including nested paths', () => {

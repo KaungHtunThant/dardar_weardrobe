@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { StyleMatch } from '#shared/models/styleMatch'
+import type { StyleRequestInput } from '#shared/models/styleRequest'
 import { favouriteLooks, recentLooks, todaysPick } from '#shared/utils/looks'
 import { useGateway } from '~/gateways/provider'
 
@@ -11,12 +12,18 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
   const loaded = ref(false)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const generating = ref(false)
+  const generateError = ref<string | null>(null)
   let inFlight: Promise<void> | null = null
 
   const favourites = computed(() => favouriteLooks(looks.value))
 
   function recent(limit: number) {
     return recentLooks(looks.value, limit)
+  }
+
+  function byId(id: string) {
+    return looks.value.find((l) => l.id === id) ?? null
   }
 
   function pickFor(date: string) {
@@ -54,5 +61,34 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     }
   }
 
-  return { looks, favourites, loaded, loading, error, recent, pickFor, load, toggleFavourite }
+  async function generate(request: StyleRequestInput): Promise<StyleMatch | null> {
+    generating.value = true
+    generateError.value = null
+    try {
+      const look = await useGateway().generateLook(request)
+      looks.value = [...looks.value, look]
+      return look
+    } catch (e) {
+      generateError.value = message(e)
+      return null
+    } finally {
+      generating.value = false
+    }
+  }
+
+  return {
+    looks,
+    favourites,
+    loaded,
+    loading,
+    error,
+    generating,
+    generateError,
+    recent,
+    byId,
+    pickFor,
+    load,
+    toggleFavourite,
+    generate,
+  }
 })

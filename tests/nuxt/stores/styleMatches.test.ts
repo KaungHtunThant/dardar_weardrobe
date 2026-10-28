@@ -38,4 +38,24 @@ describe('style matches store', () => {
     expect(store.looks.find((l) => l.id === 'look-date-night')!.isFavourite).toBe(false)
     expect(store.error).toBe('nope')
   })
+
+  it('generates a look, adds it to the front of recent looks and tracks progress', async () => {
+    const store = useStyleMatchesStore()
+    await store.load()
+    const pending = store.generate({ pinnedItemIds: ['item-linen-tee'], fillCategories: ['bottoms', 'shoes'] })
+    expect(store.generating).toBe(true)
+    const look = await pending
+    expect(store.generating).toBe(false)
+    expect(store.recent(1)[0]!.id).toBe(look!.id)
+    expect(store.byId(look!.id)?.rating).toBeDefined()
+  })
+
+  it('records a generation error and returns null', async () => {
+    vi.spyOn(gateway, 'generateLook').mockRejectedValueOnce(new Error('advisor down'))
+    const store = useStyleMatchesStore()
+    await store.load()
+    expect(await store.generate({ fillCategories: ['tops'] })).toBeNull()
+    expect(store.generateError).toBe('advisor down')
+    expect(store.generating).toBe(false)
+  })
 })

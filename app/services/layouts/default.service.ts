@@ -8,6 +8,7 @@ export interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: 'lucide:house' },
+  { to: '/studio', label: 'Studio', icon: 'lucide:wand-sparkles' },
   { to: '/wardrobe', label: 'Wardrobe', icon: 'lucide:shirt' },
 ]
 

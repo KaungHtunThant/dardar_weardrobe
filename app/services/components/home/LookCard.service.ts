@@ -6,5 +6,6 @@ import { pieces } from '~/services/plural'
 export function useLookCard(props: { entry: LookWithItems }) {
   const dateLabel = computed(() => shortDateLabel(props.entry.look.createdAt))
   const piecesLabel = computed(() => pieces(props.entry.look.itemIds.length))
-  return { dateLabel, piecesLabel }
+  const scoreLabel = computed(() => (props.entry.look.rating ? `${props.entry.look.rating.score}/10` : null))
+  return { dateLabel, piecesLabel, scoreLabel }
 }

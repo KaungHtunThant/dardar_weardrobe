@@ -238,7 +238,7 @@ export function rate(look: readonly Item[], wardrobe: readonly Item[]): StyleRat
     }
   } else if (look.length > 1) {
     score += 1
-    works.push(palette.length ? `Disciplined palette: ${palette.join(' with neutrals')}.` : 'All neutrals — calm and expensive-looking.')
+    works.push(palette.length ? `Disciplined palette: ${palette.join(' and ')} with neutrals.` : 'All neutrals — calm and expensive-looking.')
   }
 
   // Silhouette: a dress or separates, then shoes.

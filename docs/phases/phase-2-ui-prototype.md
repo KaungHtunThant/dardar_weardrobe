@@ -5,6 +5,8 @@
 - `1e0c0a4`: part 1, mock gateway, stores, shell and Home
 - `a9fe6aa`: part 2, Wardrobe closet and list views
 - `745e576`: part 3, add-item flow
+- `079603e`: part 4a, style requests, ratings and the mock advisor
+- part 4b (this commit): the Style Studio page
 
 ## Goal
 Build the whole UI as a working prototype with no backend, so the experience can be reviewed early. Data comes from a mock gateway that saves to IndexedDB.
@@ -50,7 +52,39 @@ Build the whole UI as a working prototype with no backend, so the experience can
 3. **Details:** the clean image is previewed next to a form validated by zod. It has the name, category chips (pre-selected from the open closet or the list filter), colours (comma-separated), brand, size, season and occasion chips, and notes. Each field shows its own error.
 4. **Save:** the item appears at the top of the list and of its closet, and survives a reload.
 
+### Style Studio (`app/pages/studio.vue`), added at the user's request
+On one page the user mixes their own picks with AI picks, and gets a brutally honest rating.
+1. **Pick your pieces (optional):** `studio/PiecePicker.vue`. Category tabs show how many pieces have been picked in each; tap a piece to pick or unpick it.
+2. **Let the AI fill:** `studio/FillToggles.vue`. One toggle per category; the defaults are tops, bottoms, shoes and bags. A category you already picked from shows "yours" and is locked.
+3. **Describe the vibe (optional):** a free-text prompt.
+4. **Your look:** `studio/LookBoard.vue`. Your picks, plus a dashed "AI picks …" placeholder for each category the AI will fill.
+5. **Generate & rate:** shows "Styling… and judging", then the result:
+   - `studio/ResultLook.vue`: the completed look, with an "AI pick" badge on each piece the AI chose.
+   - `studio/RatingCard.vue`: the score out of 10, a blunt verdict, what works, what doesn't, and fixes that use the user's own clothes. "Try it" applies a fix and the look is re-rated in place.
+6. The look is saved as a style match with its rating, so it appears in Home's "Recently styled" with its score. "Tweak picks" keeps your selections; "Start fresh" clears them.
+
+Domain additions:
+- **`shared/models/styleRequest.ts`:** picked piece ids, the categories open to the AI, and an optional prompt. At least one pick or one category is required.
+- **`shared/models/styleMatch.ts`:** gains `rating` (`StyleRatingSchema`) and `aiItemIds`.
+- **`shared/contracts/StyleAdvisor.ts`:** `suggestLook({ wardrobe, pinnedItemIds, fillCategories, prompt? })`.
+- **`WardrobeGateway`:** gains `StylingGateway.generateLook()`.
+
+**`app/gateways/mock/MockStyleAdvisor.ts`:** a deterministic, rule-based stand-in for Claude.
+- It fills gaps by scoring candidates on occasion (from the prompt or your picks), season and colour harmony.
+- It never pairs its own dress with separates.
+- It rates from a base of 6:
+  - **Up** for a single shared occasion, a disciplined palette, and a complete outfit.
+  - **Down** for pieces dressed for different occasions, clashing seasons, three or more statement colours, a dress worn with separates, missing shoes, or a single piece.
+- Each problem comes with a fix from the user's wardrobe where possible.
+
 ## Tests
+- **Advisor contract:** `tests/contracts/styleAdvisor.contract.ts`. Every advisor, including the future Claude CLI and API providers, must pass it. It checks that the advisor:
+  - keeps the picked pieces;
+  - adds at most one piece per open category;
+  - doesn't fill a category the user picked from;
+  - never pairs its own dress with separates;
+  - can build a whole look or simply rate one;
+  - only suggests fixes that use real wardrobe pieces.
 - **Contract:** the mock gateway passes the shared suite with both the memory and the IndexedDB stores, plus persistence, data-URL and clock tests.
 - **Nuxt (`tests/nuxt/`):**
   - The stores.
@@ -66,7 +100,11 @@ Build the whole UI as a working prototype with no backend, so the experience can
     - the list filter and vertical scrolling;
     - the floating button present in both views.
   - `add-item.spec.ts`: adding an item from the list view (it then appears in the list and in its closet), and an added item surviving a reload.
-- **Totals:** 96 unit and component tests and 10 e2e tests, all passing; lint and typecheck clean.
+  - `studio.spec.ts`:
+    - mixing your picks with AI picks, getting a rating, applying a fix (the look is re-rated), and seeing it on Home;
+    - an all-AI look;
+    - Generate disabled when there is nothing to do.
+- **Totals:** 137 unit and component tests and 13 e2e tests, all passing; lint and typecheck clean.
 
 ## Key decisions
 - **Background removal is simulated.** Claude cannot edit images; real removal is Phase 4.
@@ -83,6 +121,5 @@ npm run dev        # manual review in the Electron window
 ```
 
 ## Next
-- The user reviews the prototype.
-- The next prototype step is the **style-match request screen**: ask for a look, with or without a custom prompt, using a mock advisor.
-- Then Phase 3.
+- The user reviews the prototype, including the Style Studio.
+- Then Phase 3 (backend). In Phase 4 the Claude providers replace `MockStyleAdvisor`, behind the same contract.

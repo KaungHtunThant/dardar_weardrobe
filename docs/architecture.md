@@ -32,6 +32,7 @@ tests/                  unit/, nuxt/, contracts/, e2e/
 - Views never touch stores, and stores never know which gateway they are using.
 - `app/gateways/provider.ts` is the only link between stores and the gateway: `provideGateway()` / `useGateway()`.
 - `app/gateways/createGateway.ts` is the only file that creates a concrete gateway. It picks one from `runtimeConfig.public.gateway`.
+- AI styling sits behind `StyleAdvisor`. The mock gateway uses `MockStyleAdvisor` today, injected through its `advisor` option. In Phase 4 the server gets `ClaudeCliProvider` and `ClaudeApiProvider`; both pass the same advisor contract suite.
 
 ## Views are markup only
 
