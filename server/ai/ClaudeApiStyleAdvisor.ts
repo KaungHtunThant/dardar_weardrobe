@@ -16,7 +16,7 @@ type StructuredResult = { stop_reason: string | null; parsed_output?: unknown }
 
 /** The slice of the SDK the tagger uses (`client.beta.messages.parse`), so tests can pass a fake. */
 export interface StructuredMessages {
-  parse(params: ParseParams): Promise<StructuredResult>
+  parse(params: ParseParams, options?: { signal?: AbortSignal }): Promise<StructuredResult>
 }
 
 /** The slice of the SDK the stylist uses (`client.beta.messages.stream`), so tests can pass a fake. */

@@ -1,3 +1,4 @@
+import type { GarmentAnalyst } from '#shared/contracts/GarmentAnalyst'
 import type { GarmentTagger } from '#shared/contracts/GarmentTagger'
 import type { SecretStore } from '#shared/contracts/SecretStore'
 import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
@@ -22,6 +23,12 @@ export interface TaggerFactory {
   api(settings: Settings, apiKey: string): GarmentTagger
 }
 
+export interface AnalystFactory {
+  offline(): GarmentAnalyst
+  cli(settings: Settings): GarmentAnalyst
+  api(settings: Settings, apiKey: string): GarmentAnalyst
+}
+
 /** The on-device stylist agent, as far as settings are concerned. */
 export interface StylistAgentSetup {
   info(): StylistAgentInfo | null
@@ -37,6 +44,7 @@ export interface SettingsServiceOptions {
   runner: ProcessRunner
   advisors: AdvisorFactory
   taggers?: TaggerFactory
+  analysts?: AnalystFactory
   /** ANTHROPIC_API_KEY from the environment, which wins over a stored key. */
   envApiKey: () => string | null
   /** 'auto' picks CLI → API → Offline on first run; tests pin 'offline'. */
@@ -119,15 +127,24 @@ export class SettingsService {
 
   /** The garment tagger for add-item pre-fill; without a usable AI it suggests nothing. */
   async resolveTagger(): Promise<GarmentTagger> {
-    const none: GarmentTagger = { suggestDetails: async () => ({}) }
     const t = this.o.taggers
-    if (!t) return none
+    return t ? this.pick(t) : { suggestDetails: async () => ({}) }
+  }
+
+  /** The analyst that finds the garment in a new upload; without a usable AI it finds nothing. */
+  async resolveAnalyst(): Promise<GarmentAnalyst> {
+    const a = this.o.analysts
+    return a ? this.pick(a) : { analyze: async () => ({ focus: null, worn: false, details: {} }) }
+  }
+
+  /** CLI or API per the settings; offline when that mode can't run (no API key). */
+  private async pick<T>(f: { offline(): T; cli(s: Settings): T; api(s: Settings, key: string): T }): Promise<T> {
     const settings = await this.current()
-    if (settings.advisor === 'claude-cli') return t.cli(settings)
+    if (settings.advisor === 'claude-cli') return f.cli(settings)
     if (settings.advisor === 'claude-api') {
       const key = await this.apiKey()
-      return key ? t.api(settings, key.key) : t.offline()
+      return key ? f.api(settings, key.key) : f.offline()
     }
-    return t.offline()
+    return f.offline()
   }
 }

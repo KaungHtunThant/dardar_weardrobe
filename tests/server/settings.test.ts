@@ -113,6 +113,27 @@ describe('SettingsService', () => {
     expect((await service().get()).agent).toBeNull()
   })
 
+  it('resolves the garment analyst from the current settings, falling back to offline', async () => {
+    const named = (name: string) => ({ analyze: async () => ({ focus: null, worn: false, details: { name } }) })
+    const s = new SettingsService({
+      store: new SettingsStore(join(dir, 'settings.json')),
+      secrets: new FileSecretStore(join(dir, 'secrets.json')),
+      runner: cliMissing,
+      advisors: factory,
+      analysts: { offline: () => named('offline'), cli: (x) => named(`cli:${x.model}`), api: (_x, key) => named(`api:${key}`) },
+      envApiKey: () => null,
+      defaultAdvisor: 'auto',
+    })
+    const nameOfAnalyst = async () => (await (await s.resolveAnalyst()).analyze({} as never)).details.name
+    expect(await nameOfAnalyst()).toBe('offline')
+    await s.update({ advisor: 'claude-cli', model: 'claude-haiku-5-5' })
+    expect(await nameOfAnalyst()).toBe('cli:claude-haiku-5-5')
+    await s.update({ advisor: 'claude-api' })
+    expect(await nameOfAnalyst()).toBe('offline')
+    await s.update({ apiKey: 'sk-9' })
+    expect(await nameOfAnalyst()).toBe('api:sk-9')
+  })
+
   it('explains what to do when API mode has no key', async () => {
     const s = service()
     await s.update({ advisor: 'claude-api' })

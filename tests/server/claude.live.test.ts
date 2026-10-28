@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
@@ -7,6 +7,8 @@ import type { StyleAdvisor, StyleProgress } from '#shared/contracts/StyleAdvisor
 import { StyleRatingSchema } from '#shared/models/styleMatch'
 import { seedItems } from '#shared/fixtures/seed'
 import { ClaudeApiStyleAdvisor } from '../../server/ai/ClaudeApiStyleAdvisor'
+import { ClaudeApiGarmentAnalyst } from '../../server/ai/ClaudeApiGarmentAnalyst'
+import { ClaudeCliGarmentAnalyst } from '../../server/ai/ClaudeCliGarmentAnalyst'
 import { ClaudeCliStyleAdvisor } from '../../server/ai/ClaudeCliStyleAdvisor'
 import { runProcess } from '../../server/ai/process'
 import { LocalStylistAgent } from '../../server/agent/LocalStylistAgent'
@@ -75,5 +77,27 @@ describe.runIf(process.env.RUN_LIVE === '1')('Claude advisors (live)', () => {
 
   it.runIf(Boolean(process.env.ANTHROPIC_API_KEY))('API styles and rates a look', async () => {
     check(await new ClaudeApiStyleAdvisor({ messages: new Anthropic().beta.messages }).suggestLook(request))
+  }, 240_000)
+
+  const wornPhoto = () => {
+    const path = join(process.cwd(), 'tests/fixtures/photos/red-tshirt-worn.jpg')
+    return { bytes: new Uint8Array(readFileSync(path)), mimeType: 'image/jpeg', path }
+  }
+  /** The tee covers roughly the lower two thirds of the photo, below the face. */
+  function checkAnalysis(a: Awaited<ReturnType<ClaudeCliGarmentAnalyst['analyze']>>) {
+    console.log(JSON.stringify(a))
+    expect(a.worn).toBe(true)
+    expect(a.details.category).toBe('tops')
+    expect(a.focus).not.toBeNull()
+    expect(a.focus!.y).toBeGreaterThan(0.25)
+    expect(a.focus!.y + a.focus!.h).toBeGreaterThan(0.85)
+  }
+
+  it('CLI finds the worn tee in a photo', async () => {
+    checkAnalysis(await new ClaudeCliGarmentAnalyst({ runner: runProcess, model: process.env.CLAUDE_MODEL }).analyze(wornPhoto()))
+  }, 240_000)
+
+  it.runIf(Boolean(process.env.ANTHROPIC_API_KEY))('API finds the worn tee in a photo', async () => {
+    checkAnalysis(await new ClaudeApiGarmentAnalyst({ messages: new Anthropic().beta.messages }).analyze(wornPhoto()))
   }, 240_000)
 })

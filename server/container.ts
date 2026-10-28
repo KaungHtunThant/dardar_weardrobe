@@ -6,10 +6,13 @@ import type { SecretStore } from '#shared/contracts/SecretStore'
 import type { StylistAgent } from '#shared/contracts/StylistAgent'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
 import type { AdvisorMode } from '#shared/models/settings'
+import { ClaudeApiGarmentAnalyst } from './ai/ClaudeApiGarmentAnalyst'
 import { ClaudeApiStyleAdvisor } from './ai/ClaudeApiStyleAdvisor'
 import { ClaudeApiTagger } from './ai/ClaudeApiTagger'
+import { ClaudeCliGarmentAnalyst } from './ai/ClaudeCliGarmentAnalyst'
 import { ClaudeCliStyleAdvisor } from './ai/ClaudeCliStyleAdvisor'
 import { ClaudeCliTagger } from './ai/ClaudeCliTagger'
+import { OfflineGarmentAnalyst } from './ai/OfflineGarmentAnalyst'
 import { runProcess, type ProcessRunner } from './ai/process'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
@@ -28,7 +31,7 @@ import { StylingService } from './services/StylingService'
 import { TaggingService } from './services/TaggingService'
 import { TodayService } from './services/TodayService'
 import { FileSecretStore } from './settings/FileSecretStore'
-import { SettingsService, type AdvisorFactory, type TaggerFactory } from './settings/SettingsService'
+import { SettingsService, type AdvisorFactory, type AnalystFactory, type TaggerFactory } from './settings/SettingsService'
 import { SettingsStore } from './settings/SettingsStore'
 
 export interface ContainerOptions {
@@ -47,12 +50,13 @@ export interface ContainerOptions {
   secrets?: SecretStore
   advisors?: AdvisorFactory
   taggers?: TaggerFactory
+  analysts?: AnalystFactory
   defaultAdvisor?: 'auto' | AdvisorMode
   envApiKey?: () => string | null
 }
 
 /** Real AI per mode, every Claude call running as the stylist agent; one SDK client per API key. */
-function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: AdvisorFactory; taggers: TaggerFactory } {
+function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: AdvisorFactory; taggers: TaggerFactory; analysts: AnalystFactory } {
   const offline = new RuleBasedStyleAdvisor()
   const clients = new Map<string, Anthropic>()
   const messages = (apiKey: string) => {
@@ -69,6 +73,11 @@ function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: Ad
       offline: () => ({ suggestDetails: async () => ({}) }),
       cli: (s) => new ClaudeCliTagger({ runner, model: s.model, agent }),
       api: (s, apiKey) => new ClaudeApiTagger({ messages: messages(apiKey), model: s.model, agent }),
+    },
+    analysts: {
+      offline: () => new OfflineGarmentAnalyst(),
+      cli: (s) => new ClaudeCliGarmentAnalyst({ runner, model: s.model, agent }),
+      api: (s, apiKey) => new ClaudeApiGarmentAnalyst({ messages: messages(apiKey), model: s.model, agent }),
     },
   }
 }
@@ -92,6 +101,7 @@ export async function createContainer(options: ContainerOptions) {
     runner,
     advisors: options.advisors ?? ai.advisors,
     taggers: options.taggers ?? ai.taggers,
+    analysts: options.analysts ?? ai.analysts,
     envApiKey: options.envApiKey ?? (() => process.env.ANTHROPIC_API_KEY || null),
     defaultAdvisor: options.defaultAdvisor ?? 'auto',
   })
