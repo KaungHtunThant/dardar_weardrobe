@@ -7,6 +7,7 @@
 - `745e576`: part 3, add-item flow
 - `079603e`: part 4a, style requests, ratings and the mock advisor
 - `09b754b`: part 4b, the Style Studio page
+- `5cd5013`: the Style Studio redesigned in the Sims character-editor style (dress form + wardrobe panel)
 
 ## Goal
 Build the whole UI as a working prototype with no backend, so the experience can be reviewed early. Data comes from a mock gateway that saves to IndexedDB.
