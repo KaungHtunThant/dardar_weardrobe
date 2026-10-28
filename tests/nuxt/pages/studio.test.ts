@@ -15,21 +15,30 @@ describe('studio page', () => {
     warn.mockRestore()
   })
 
-  it('composes: picker, AI slots, toggles and the generate button', async () => {
+  it('shows the dress form with AI placeholders and the full wardrobe panel', async () => {
     const wrapper = await mountSuspended(StudioPage, { route: '/studio' })
     await flushPromises()
-    expect(wrapper.findAll('[data-testid="piece-grid"] button')).toHaveLength(7)
+    expect(wrapper.find('[data-testid="dress-form"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="ai-slot"]')).toHaveLength(4)
-    expect(wrapper.text()).toContain('Generate & rate')
+    expect(wrapper.findAll('[data-testid="panel-grid"] button')).toHaveLength(33)
   })
 
-  it('shows the rated result after generating', async () => {
+  it('dresses the form from the panel and filters the panel from the form', async () => {
     const wrapper = await mountSuspended(StudioPage, { route: '/studio' })
     await flushPromises()
-    const generate = wrapper.findAll('button').find((b) => b.text().includes('Generate & rate'))!
-    await generate.trigger('click')
+    await wrapper.get('[aria-label="Wear Red Pumps"]').trigger('click')
+    const piece = wrapper.get('[data-testid="worn-piece"]')
+    expect(piece.attributes('data-slot')).toBe('feet')
+    await piece.trigger('click')
+    expect(wrapper.findAll('[data-testid="panel-grid"] button')).toHaveLength(4)
+  })
+
+  it('shows the verdict after generating', async () => {
+    const wrapper = await mountSuspended(StudioPage, { route: '/studio' })
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text().includes('Generate & rate'))!.trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-testid="score"]').text()).toMatch(/\/10$/)
-    expect(wrapper.findAll('[data-testid="result-look"] li').length).toBeGreaterThan(0)
+    expect(wrapper.findAll('[data-testid="worn-piece"][data-ai="true"]').length).toBeGreaterThan(0)
   })
 })

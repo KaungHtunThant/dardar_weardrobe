@@ -7,7 +7,7 @@ defineEmits<{ toggle: [id: CategoryId] }>()
 </script>
 
 <template>
-  <div role="group" aria-label="Let the AI fill" class="flex flex-wrap gap-2">
+  <div role="group" aria-label="Let the AI fill" class="flex flex-wrap gap-1.5">
     <button
       v-for="option in options"
       :key="option.id"
@@ -15,7 +15,7 @@ defineEmits<{ toggle: [id: CategoryId] }>()
       :aria-pressed="option.on"
       :aria-label="`AI fills ${option.label}`"
       :disabled="option.coveredByYou"
-      class="inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm tracking-wide transition-colors duration-200 disabled:cursor-default"
+      class="inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs tracking-wide transition-colors duration-200 disabled:cursor-default"
       :class="
         option.coveredByYou
           ? 'border-line bg-cream text-taupe/70'

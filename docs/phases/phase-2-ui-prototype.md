@@ -52,16 +52,32 @@ Build the whole UI as a working prototype with no backend, so the experience can
 3. **Details:** the clean image is previewed next to a form validated by zod. It has the name, category chips (pre-selected from the open closet or the list filter), colours (comma-separated), brand, size, season and occasion chips, and notes. Each field shows its own error.
 4. **Save:** the item appears at the top of the list and of its closet, and survives a reload.
 
-### Style Studio (`app/pages/studio.vue`), added at the user's request
-On one page the user mixes their own picks with AI picks, and gets a brutally honest rating.
-1. **Pick your pieces (optional):** `studio/PiecePicker.vue`. Category tabs show how many pieces have been picked in each; tap a piece to pick or unpick it.
-2. **Let the AI fill:** `studio/FillToggles.vue`. One toggle per category; the defaults are tops, bottoms, shoes and bags. A category you already picked from shows "yours" and is locked.
-3. **Describe the vibe (optional):** a free-text prompt.
-4. **Your look:** `studio/LookBoard.vue`. Your picks, plus a dashed "AI picks …" placeholder for each category the AI will fill.
-5. **Generate & rate:** shows "Styling… and judging", then the result:
-   - `studio/ResultLook.vue`: the completed look, with an "AI pick" badge on each piece the AI chose.
-   - `studio/RatingCard.vue`: the score out of 10, a blunt verdict, what works, what doesn't, and fixes that use the user's own clothes. "Try it" applies a fix and the look is re-rated in place.
-6. The look is saved as a style match with its rating, so it appears in Home's "Recently styled" with its score. "Tweak picks" keeps your selections; "Start fresh" clears them.
+### Style Studio (`app/pages/studio.vue`), Create-A-Sim style, added at the user's request
+A full-height, two-pane studio inspired by The Sims' character editor.
+
+**Left, the dress form** (`studio/DressForm.vue`, `studio/Mannequin.vue`):
+- A soft cream mannequin wears the current outfit. Each piece snaps to its body slot (`shared/utils/outfit.ts`, `slotFor` / `wear`):
+  - hats on the head, sunglasses on the face, necklaces and scarves at the neck;
+  - the top on the torso, with outerwear behind it so it reads as an open layer;
+  - a dress, or bottoms on the legs;
+  - shoes at the feet, a bag at the right hand, other accessories at the wrist.
+- Wearing a piece replaces whatever is in that slot. A dress takes off the top and bottoms, and the reverse.
+- Categories open to the AI show as dashed "AI picks …" placeholders at their body zones.
+- **Zoom:** the +, − and fit buttons, Ctrl/⌘ + mouse wheel or a trackpad pinch (zooming at the pointer), and the keys + − 0. The range is 100–300%.
+- **Scroll up and down:** the mouse wheel, dragging, or the arrow keys. Scrolling never goes past the head or the feet.
+- **Clicking a piece or a placeholder** filters the wardrobe panel to that category, and the selected category's pieces get a soft blush glow.
+- AI-chosen pieces carry an "AI" badge.
+
+**Right, the panel** (`studio/WardrobePanel.vue`, `studio/FillToggles.vue`, `studio/RatingCard.vue`):
+- **Wardrobe tab:** icon tabs for All plus each category, with a dot where something is being worn. Tapping a piece in the grid wears it; tapping again takes it off.
+- **Verdict tab** (opens after generating): the look's title, its explanation, a favourite heart, and the rating card:
+  - a score out of 10;
+  - a blunt verdict;
+  - what works and what doesn't;
+  - fixes from the user's wardrobe, where "Try it" applies the fix on the form and re-rates in place.
+- **Always at the bottom:** the "Let the AI fill" category toggles (a worn category shows "yours" and is locked), an optional vibe prompt, and **Generate & rate**.
+- **Stale verdict:** changing the outfit after a verdict marks it out of date ("outfit changed since it was rated"). "Clear outfit" starts over.
+- **Saving:** each generated look is saved and appears in Home's "Recently styled" with its score.
 
 Domain additions:
 - **`shared/models/styleRequest.ts`:** picked piece ids, the categories open to the AI, and an optional prompt. At least one pick or one category is required.
@@ -101,10 +117,13 @@ Domain additions:
     - the floating button present in both views.
   - `add-item.spec.ts`: adding an item from the list view (it then appears in the list and in its closet), and an added item surviving a reload.
   - `studio.spec.ts`:
-    - mixing your picks with AI picks, getting a rating, applying a fix (the look is re-rated), and seeing it on Home;
-    - an all-AI look;
+    - dressing the form from the panel (slot swaps, a dress replacing separates, taking pieces off);
+    - clicking a form piece or placeholder filters the panel;
+    - zooming in and out, and wheel-scrolling up and down with no page scroll;
+    - generating, the AI badges, a fix re-rating the look, the stale notice, and the look showing on Home;
+    - an all-AI look, and Clear;
     - Generate disabled when there is nothing to do.
-- **Totals:** 137 unit and component tests and 13 e2e tests, all passing; lint and typecheck clean.
+- **Totals:** 156 unit and component tests and 16 e2e tests, all passing; lint and typecheck clean.
 
 ## Key decisions
 - **Background removal is simulated.** Claude cannot edit images; real removal is Phase 4.

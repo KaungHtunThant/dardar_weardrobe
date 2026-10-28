@@ -2,18 +2,34 @@ import { computed, ref } from 'vue'
 import { CATEGORIES, type CategoryId } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
 import type { StyleFix } from '#shared/models/styleMatch'
+import { slotFor, wear, type BodySlot } from '#shared/utils/outfit'
+import type { CategoryFilter } from '#shared/utils/wardrobe'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted } from '~/services/lifecycle'
 
-export type StudioStage = 'compose' | 'generating' | 'result'
+export type PanelTab = 'wardrobe' | 'verdict'
 
 export interface FillOption {
   id: CategoryId
   label: string
   on: boolean
-  /** You already picked something here, so the AI leaves it alone. */
+  /** Something from this category is already on the form, so the AI leaves it alone. */
   coveredByYou: boolean
+}
+
+/** A piece on the dress form. */
+export interface PlacedPiece {
+  item: Item
+  slot: BodySlot
+  isAi: boolean
+}
+
+/** A dashed placeholder where the AI will add a piece. */
+export interface Ghost {
+  id: CategoryId
+  label: string
+  slot: BodySlot
 }
 
 export interface ResolvedFix extends StyleFix {
@@ -22,108 +38,140 @@ export interface ResolvedFix extends StyleFix {
 }
 
 const DEFAULT_FILL: CategoryId[] = ['tops', 'bottoms', 'shoes', 'bags']
-const MAX_PICKS = 12
+const GHOST_SLOT: Record<CategoryId, BodySlot> = {
+  tops: 'torso',
+  bottoms: 'legs',
+  dresses: 'dress',
+  outerwear: 'outer',
+  shoes: 'feet',
+  bags: 'hand',
+  accessories: 'neck',
+}
 
 /**
- * Style Studio controller: the user picks pieces (or not), chooses which categories
- * the AI may fill, optionally describes a vibe, then gets a completed, brutally rated look.
+ * Style Studio controller, Create-A-Sim style: the dress form on the left wears the outfit,
+ * the wardrobe panel on the right dresses it. The AI fills the chosen categories and rates the look.
  */
 export function useStudioPage() {
   const wardrobe = useWardrobeStore()
   const looks = useStyleMatchesStore()
 
-  const pinnedIds = ref<string[]>([])
+  const outfitIds = ref<string[]>([])
+  const aiIds = ref<string[]>([])
   const fill = ref<CategoryId[]>([...DEFAULT_FILL])
   const prompt = ref('')
-  const stage = ref<StudioStage>('compose')
+  const panelCategory = ref<CategoryFilter>('all')
+  const panelTab = ref<PanelTab>('wardrobe')
   const resultId = ref<string | null>(null)
+  const stale = ref(false)
 
   const byId = (id?: string) => (id ? wardrobe.items.find((i) => i.id === id) : undefined)
 
-  const items = computed(() => wardrobe.items)
-  const pinnedItems = computed(() => pinnedIds.value.flatMap((id) => byId(id) ?? []))
-  const covered = computed(() => new Set(pinnedItems.value.map((i) => i.category)))
+  const outfit = computed(() => outfitIds.value.flatMap((id) => byId(id) ?? []))
+  const placed = computed<PlacedPiece[]>(() =>
+    outfit.value.map((item) => ({ item, slot: slotFor(item), isAi: aiIds.value.includes(item.id) })),
+  )
+  const covered = computed(() => new Set(outfit.value.map((i) => i.category)))
+  const wearsDress = computed(() => covered.value.has('dresses'))
+  const wearsSeparates = computed(() => covered.value.has('tops') || covered.value.has('bottoms'))
 
   const fillOptions = computed<FillOption[]>(() =>
-    CATEGORIES.map((c) => ({
-      id: c.id,
-      label: c.label,
-      on: fill.value.includes(c.id),
-      coveredByYou: covered.value.has(c.id),
-    })),
+    CATEGORIES.map((c) => ({ id: c.id, label: c.label, on: fill.value.includes(c.id), coveredByYou: covered.value.has(c.id) })),
   )
-  const aiSlots = computed(() => fillOptions.value.filter((o) => o.on && !o.coveredByYou))
-  const canGenerate = computed(
-    () => stage.value !== 'generating' && (pinnedIds.value.length > 0 || aiSlots.value.length > 0),
-  )
+  const openToAi = computed(() => fillOptions.value.filter((o) => o.on && !o.coveredByYou).map((o) => o.id))
+  const ghosts = computed<Ghost[]>(() => {
+    const open = openToAi.value
+    return open
+      .filter((id) => {
+        if ((id === 'tops' || id === 'bottoms') && wearsDress.value) return false
+        // The AI prefers separates when both are allowed, so don't draw a dress over them.
+        if (id === 'dresses') return !wearsSeparates.value && !open.includes('tops') && !open.includes('bottoms')
+        return true
+      })
+      .map((id) => ({ id, label: CATEGORIES.find((c) => c.id === id)!.label, slot: GHOST_SLOT[id] }))
+  })
+
+  const panelItems = computed(() => wardrobe.byCategory(panelCategory.value))
+  const wornIds = computed(() => outfitIds.value)
+  const wornCategories = computed(() => [...covered.value])
+  const busy = computed(() => looks.generating)
+  const canGenerate = computed(() => !busy.value && (outfitIds.value.length > 0 || openToAi.value.length > 0))
 
   const result = computed(() => (resultId.value ? looks.byId(resultId.value) : null))
-  const resultItems = computed(() =>
-    (result.value?.itemIds ?? []).flatMap((id) => {
-      const item = byId(id)
-      return item ? [{ item, isAi: result.value!.aiItemIds?.includes(id) ?? false }] : []
-    }),
-  )
   const scoreLabel = computed(() => (result.value?.rating ? `${result.value.rating.score}/10` : ''))
   const fixes = computed<ResolvedFix[]>(() =>
     (result.value?.rating?.fixes ?? []).map((f) => ({ ...f, addItem: byId(f.addItemId), removeItem: byId(f.removeItemId) })),
   )
   const error = computed(() => looks.generateError ?? wardrobe.error)
   const loading = computed(() => !wardrobe.loaded && !wardrobe.error)
-  const busy = computed(() => looks.generating)
 
-  function isPinned(id: string) {
-    return pinnedIds.value.includes(id)
+  function isWorn(id: string) {
+    return outfitIds.value.includes(id)
   }
 
-  function togglePin(id: string) {
-    if (isPinned(id)) pinnedIds.value = pinnedIds.value.filter((p) => p !== id)
-    else if (pinnedIds.value.length < MAX_PICKS) pinnedIds.value = [...pinnedIds.value, id]
+  function setOutfit(ids: string[]) {
+    outfitIds.value = ids
+    aiIds.value = aiIds.value.filter((id) => ids.includes(id))
+    if (resultId.value) stale.value = true
+  }
+
+  /** Puts a piece on (swapping out its slot) or takes it off. */
+  function toggleWear(id: string) {
+    const item = byId(id)
+    if (!item) return
+    setOutfit(isWorn(id) ? outfitIds.value.filter((o) => o !== id) : wear(outfit.value, item).map((i) => i.id))
+  }
+
+  /** Clicking a piece or placeholder on the form browses that category. */
+  function focusCategory(id: CategoryId) {
+    panelCategory.value = id
+    panelTab.value = 'wardrobe'
+  }
+
+  function selectPanelCategory(id: CategoryFilter) {
+    panelCategory.value = id
+  }
+
+  function setPanelTab(tab: PanelTab) {
+    panelTab.value = tab
   }
 
   function toggleFill(id: CategoryId) {
     fill.value = fill.value.includes(id) ? fill.value.filter((c) => c !== id) : [...fill.value, id]
   }
 
-  /** `rerate` keeps the current result on screen while the adjusted look is judged. */
-  async function run(pinned: string[], fillCategories: CategoryId[], rerate = false) {
-    if (!rerate) stage.value = 'generating'
+  async function run(pinned: string[], fillCategories: CategoryId[]) {
+    const previousAi = aiIds.value
     const look = await looks.generate({ pinnedItemIds: pinned, fillCategories, prompt: prompt.value })
-    if (look) {
-      resultId.value = look.id
-      stage.value = 'result'
-    } else if (!rerate) {
-      stage.value = 'compose'
-    }
+    if (!look) return
+    outfitIds.value = look.itemIds
+    aiIds.value = [...new Set([...previousAi.filter((id) => look.itemIds.includes(id)), ...(look.aiItemIds ?? [])])]
+    resultId.value = look.id
+    stale.value = false
+    panelTab.value = 'verdict'
   }
 
   function generate() {
-    if (!canGenerate.value) return Promise.resolve()
-    return run(pinnedIds.value, fill.value)
+    return canGenerate.value ? run(outfitIds.value, fill.value) : Promise.resolve()
   }
 
-  /** Takes the advisor's advice: apply the swap to the look and have it re-rated as-is. */
+  /** Takes the advisor's advice: apply the swap and have the look re-rated as worn. */
   function applyFix(fix: ResolvedFix) {
-    const next = (result.value?.itemIds ?? []).filter((id) => id !== fix.removeItemId)
+    const next = outfitIds.value.filter((id) => id !== fix.removeItemId)
     if (fix.addItemId && !next.includes(fix.addItemId)) next.push(fix.addItemId)
-    pinnedIds.value = next
-    return run(next, [], true)
+    return run(next, [])
   }
 
   function toggleFavourite() {
     return resultId.value ? looks.toggleFavourite(resultId.value) : Promise.resolve()
   }
 
-  function tweak() {
-    stage.value = 'compose'
-  }
-
-  function reset() {
-    pinnedIds.value = []
-    fill.value = [...DEFAULT_FILL]
-    prompt.value = ''
+  function clearOutfit() {
+    outfitIds.value = []
+    aiIds.value = []
     resultId.value = null
-    stage.value = 'compose'
+    stale.value = false
+    panelTab.value = 'wardrobe'
   }
 
   function init() {
@@ -133,29 +181,33 @@ export function useStudioPage() {
   onViewMounted(init)
 
   return {
-    items,
-    pinnedIds,
-    pinnedItems,
+    placed,
+    ghosts,
     fillOptions,
-    aiSlots,
     prompt,
-    stage,
+    panelCategory,
+    panelItems,
+    wornIds,
+    wornCategories,
+    panelTab,
     canGenerate,
+    busy,
     result,
-    resultItems,
+    stale,
     scoreLabel,
     fixes,
     error,
     loading,
-    busy,
     init,
-    isPinned,
-    togglePin,
+    isWorn,
+    toggleWear,
+    focusCategory,
+    selectPanelCategory,
+    setPanelTab,
     toggleFill,
     generate,
     applyFix,
     toggleFavourite,
-    tweak,
-    reset,
+    clearOutfit,
   }
 }
