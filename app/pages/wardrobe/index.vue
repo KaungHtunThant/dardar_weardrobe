@@ -57,5 +57,6 @@ const vm = useWardrobePage()
     </template>
 
     <UiFab label="Add item" @click="vm.openAdd" />
+    <ItemAddDialog :open="vm.isAddOpen.value" :default-category="vm.addDefaultCategory.value" @update:open="vm.setAddOpen" />
   </div>
 </template>
