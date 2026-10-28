@@ -3,6 +3,7 @@ import type { WardrobeGateway } from '#shared/contracts/WardrobeGateway'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import { ItemSchema } from '#shared/models/item'
+import { StyleMatchSchema } from '#shared/models/styleMatch'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
 
 export interface GatewaySeed {
@@ -66,6 +67,27 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
     it('rejects favouriting an unknown look', async () => {
       const gw = await fresh()
       await expect(gw.setFavourite('nope', true)).rejects.toThrow()
+    })
+
+    it('generates a rated look from picks plus AI-filled categories and saves it', async () => {
+      const gw = await fresh()
+      const look = await gw.generateLook({
+        pinnedItemIds: ['item-linen-tee'],
+        fillCategories: ['bottoms', 'shoes'],
+        prompt: 'weekend coffee',
+      })
+      expect(() => StyleMatchSchema.parse(look)).not.toThrow()
+      expect(look.itemIds[0]).toBe('item-linen-tee')
+      expect(look.aiItemIds?.length).toBeGreaterThan(0)
+      expect(look.rating?.score).toBeGreaterThanOrEqual(1)
+      expect(look.prompt).toBe('weekend coffee')
+      expect((await gw.listStyleMatches()).some((l) => l.id === look.id)).toBe(true)
+    })
+
+    it('rejects an empty or unknown styling request', async () => {
+      const gw = await fresh()
+      await expect(gw.generateLook({ pinnedItemIds: [], fillCategories: [] })).rejects.toThrow()
+      await expect(gw.generateLook({ pinnedItemIds: ['item-ghost'] })).rejects.toThrow()
     })
   })
 }

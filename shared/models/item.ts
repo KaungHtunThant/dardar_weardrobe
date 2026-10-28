@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CategoryIdSchema } from './category'
+import { optionalText } from './text'
 
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export const OCCASIONS = ['casual', 'work', 'evening', 'party', 'formal', 'sport', 'lounge'] as const
@@ -8,13 +9,6 @@ export const SeasonSchema = z.enum(SEASONS)
 export const OccasionSchema = z.enum(OCCASIONS)
 export type Season = z.infer<typeof SeasonSchema>
 export type Occasion = z.infer<typeof OccasionSchema>
-
-/** Optional free text: blank input is stored as "not provided". */
-const optionalText = (max: number) =>
-  z.preprocess(
-    (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
-    z.string().trim().max(max).optional(),
-  )
 
 /** What the user fills in on the add-item form. */
 export const ItemDetailsSchema = z.object({

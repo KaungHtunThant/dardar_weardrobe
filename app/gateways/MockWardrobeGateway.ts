@@ -1,6 +1,9 @@
+import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
 import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/contracts/WardrobeGateway'
 import { ItemDetailsSchema, type Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
+import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
+import { MockStyleAdvisor } from './mock/MockStyleAdvisor'
 import type { SnapshotStore, WardrobeSnapshot } from './persistence/SnapshotStore'
 
 export interface MockGatewayOptions {
@@ -10,6 +13,8 @@ export interface MockGatewayOptions {
   latencyMs?: number
   now?: () => Date
   newId?: () => string
+  /** Who completes and rates looks. Defaults to the rule-based prototype advisor. */
+  advisor?: StyleAdvisor
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -27,6 +32,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
   private readonly latencyMs: number
   private readonly now: () => Date
   private readonly newId: () => string
+  private readonly advisor: StyleAdvisor
 
   constructor(
     private readonly store: SnapshotStore,
@@ -35,6 +41,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
     this.latencyMs = options.latencyMs ?? 0
     this.now = options.now ?? (() => new Date())
     this.newId = options.newId ?? (() => crypto.randomUUID())
+    this.advisor = options.advisor ?? new MockStyleAdvisor()
   }
 
   private data() {
@@ -86,6 +93,27 @@ export class MockWardrobeGateway implements WardrobeGateway {
   async listStyleMatches(): Promise<StyleMatch[]> {
     await this.wait()
     return structuredClone((await this.data()).styleMatches)
+  }
+
+  async generateLook(input: StyleRequestInput): Promise<StyleMatch> {
+    const request = StyleRequestSchema.parse(input)
+    const data = await this.data()
+    const suggestion = await this.advisor.suggestLook({ wardrobe: data.items, ...request })
+    const look: StyleMatch = {
+      id: `look-${this.newId()}`,
+      title: suggestion.title,
+      itemIds: suggestion.itemIds,
+      aiItemIds: suggestion.aiItemIds,
+      ...(request.prompt ? { prompt: request.prompt } : {}),
+      explanation: suggestion.explanation,
+      rating: suggestion.rating,
+      isFavourite: false,
+      createdAt: this.now().toISOString(),
+    }
+    data.styleMatches.push(look)
+    await this.persist()
+    await this.wait(6)
+    return structuredClone(look)
   }
 
   async setFavourite(id: string, isFavourite: boolean): Promise<StyleMatch> {
