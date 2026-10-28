@@ -22,7 +22,7 @@ function launch(): Promise<ElectronApplication> {
 test.skip(!existsSync(executable), `No packaged app at ${executable}; run npm run dist:linux (or dist:win) first.`)
 test.afterAll(() => rmSync(home, { recursive: true, force: true }))
 
-test('a fresh install starts empty, removes a real background, styles offline and never stores the API key in plain text', async () => {
+test('a fresh install sets up its stylist, starts empty, cuts out a real photo in the background, styles offline and never stores the API key in plain text', async () => {
   let app = await launch()
   let page = await app.firstWindow()
   const userData = await app.evaluate(({ app }) => app.getPath('userData'))
@@ -32,20 +32,29 @@ test('a fresh install starts empty, removes a real background, styles offline an
   // Empty wardrobe, no demo data.
   await expect(page.getByText('No recommendation yet')).toBeVisible({ timeout: 60_000 })
 
+  // First launch set up the stylist agent on this computer.
+  expect(existsSync(join(userData, 'agent', 'agents.json'))).toBe(true)
+  await expect(page.getByTestId('stylist-welcome')).toBeVisible()
+
   // Offline stylist, so nothing calls a real model.
   await nav().getByRole('link', { name: 'Settings' }).click()
+  await expect(page.getByTestId('stylist-agent')).toContainText('Dardar, your stylist')
   await page.getByRole('radio', { name: /Offline/ }).click()
   if (await page.getByRole('button', { name: 'Save settings' }).isEnabled()) await page.getByRole('button', { name: 'Save settings' }).click()
 
-  // Add a real photo: the bundled model removes the background.
+  // Add a real photo: it is cut out in the background by the bundled models, then reviewed from the tray.
   await nav().getByRole('link', { name: 'Wardrobe' }).click()
   await page.getByRole('radio', { name: 'List' }).click()
   await page.getByRole('toolbar', { name: 'Filter by category' }).getByRole('button', { name: /Tops/ }).click()
   await page.getByRole('button', { name: 'Add item' }).click()
+  await page.getByRole('dialog', { name: 'Add to your wardrobe' }).getByLabel('Choose photos').setInputFiles(photo)
+  const tray = page.getByTestId('upload-tray')
+  await expect(tray).toContainText('1 ready to add', { timeout: 120_000 })
+  await tray.click()
+  await page.getByTestId('upload-tray-panel').getByRole('button', { name: 'Review' }).click()
   const dialog = page.getByRole('dialog', { name: 'Add to your wardrobe' })
-  await dialog.getByLabel('Choose a photo').setInputFiles(photo)
-  await expect(dialog.getByTestId('clean-preview')).toBeVisible({ timeout: 120_000 })
-  await expect(dialog.getByText("We couldn't remove the background")).toHaveCount(0)
+  await expect(dialog.getByTestId('clean-preview')).toHaveAttribute('src', /^\/api\/images\/.+\.png$/)
+  await expect(dialog.getByText("We couldn't cut the garment out")).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Save to wardrobe' }).click()
   await dialog.getByLabel('Name').fill('Blush Blouse')
   await dialog.getByLabel('Colours').fill('blush')

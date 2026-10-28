@@ -2,6 +2,8 @@ import type { StyleAdvisor, StyleCallOptions } from '#shared/contracts/StyleAdvi
 import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/contracts/WardrobeGateway'
 import { ItemDetailsSchema, type Item, type ItemDetailsInput } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
+import type { CategoryId } from '#shared/models/category'
+import type { Upload, UploadStage } from '#shared/models/upload'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
 import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type Settings, type SettingsUpdate, type SettingsView } from '#shared/models/settings'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
@@ -39,6 +41,9 @@ export class MockWardrobeGateway implements WardrobeGateway {
   private settings: Settings = { advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium', welcomed: false }
   private agentCreatedAt = new Date().toISOString()
   private apiKey: string | null = null
+  /** Prototype only: the upload queue lives in memory. */
+  private uploads: Upload[] = []
+  private processing: Promise<void> | null = null
 
   constructor(
     private readonly store: SnapshotStore,
@@ -149,6 +154,79 @@ export class MockWardrobeGateway implements WardrobeGateway {
     return { originalImage: image, cleanImage: image }
   }
 
+  /** Prototype: "prepares" each photo in turn by stepping through the stages; the clean image is the photo. */
+  async enqueuePhotos(photos: Blob[], { categoryHint }: { categoryHint?: CategoryId } = {}): Promise<Upload[]> {
+    if (!photos.length || photos.some((p) => !p.type.startsWith('image/'))) throw new Error('Please choose an image file.')
+    const queued: Upload[] = []
+    for (const photo of photos) {
+      const upload: Upload = {
+        id: `upload-${this.newId()}`,
+        originalImage: await blobToDataUrl(photo),
+        cleanImage: null,
+        state: 'queued',
+        stage: null,
+        categoryHint: categoryHint ?? null,
+        suggestion: null,
+        backgroundRemoved: false,
+        error: null,
+        createdAt: this.now().toISOString(),
+      }
+      this.uploads.push(upload)
+      queued.push(structuredClone(upload))
+    }
+    this.kick()
+    return queued
+  }
+
+  private kick() {
+    this.processing ??= this.processQueue().finally(() => {
+      this.processing = null
+    })
+  }
+
+  private async processQueue() {
+    for (let next = this.uploads.find((u) => u.state === 'queued'); next; next = this.uploads.find((u) => u.state === 'queued')) {
+      const upload = next
+      for (const stage of ['analyzing', 'isolating'] as UploadStage[]) {
+        Object.assign(upload, { state: 'processing', stage })
+        await new Promise((r) => setTimeout(r, this.latencyMs * 10))
+      }
+      Object.assign(upload, { state: 'ready', stage: null, cleanImage: upload.originalImage, backgroundRemoved: true, suggestion: {} })
+    }
+  }
+
+  async listUploads() {
+    await this.wait()
+    return structuredClone(this.uploads)
+  }
+
+  private upload(id: string) {
+    const upload = this.uploads.find((u) => u.id === id)
+    if (!upload) throw new Error(`Photo not found: ${id}`)
+    return upload
+  }
+
+  async retryUpload(id: string) {
+    const upload = this.upload(id)
+    if (upload.state !== 'failed') throw new Error("Only a photo that couldn't be prepared can be tried again.")
+    Object.assign(upload, { state: 'queued', error: null })
+    this.kick()
+    return structuredClone(upload)
+  }
+
+  async discardUpload(id: string) {
+    this.upload(id)
+    this.uploads = this.uploads.filter((u) => u.id !== id)
+  }
+
+  async saveUpload(id: string, details: ItemDetailsInput) {
+    const upload = this.upload(id)
+    if (upload.state !== 'ready' || !upload.cleanImage) throw new Error('This photo is still being prepared.')
+    const item = await this.createItem({ ...details, originalImage: upload.originalImage, cleanImage: upload.cleanImage })
+    this.uploads = this.uploads.filter((u) => u.id !== id)
+    return item
+  }
+
   async listStyleMatches(): Promise<StyleMatch[]> {
     await this.wait()
     return structuredClone((await this.data()).styleMatches)
@@ -214,6 +292,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
   }
 
   async clearWardrobe() {
+    this.uploads = []
     const data = await this.data()
     data.items = []
     data.styleMatches = []

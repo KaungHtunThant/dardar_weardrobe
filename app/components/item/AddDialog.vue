@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { CategoryId } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
+import type { Upload } from '#shared/models/upload'
 import { useAddDialog } from '~/services/components/item/AddDialog.service'
 
-const props = defineProps<{ open: boolean; defaultCategory?: CategoryId }>()
-const emit = defineEmits<{ 'update:open': [open: boolean]; saved: [item: Item] }>()
+const props = defineProps<{ open: boolean; defaultCategory?: CategoryId; upload?: Upload | null }>()
+const emit = defineEmits<{ 'update:open': [open: boolean]; saved: [item: Item]; queued: [count: number] }>()
 const vm = useAddDialog(props, emit)
 </script>
 
@@ -12,10 +13,10 @@ const vm = useAddDialog(props, emit)
   <UiDialog
     :open="open"
     title="Add to your wardrobe"
-    description="Upload a photo — we'll lift the piece off its background so only the garment remains."
+    :description="vm.description.value"
     @update:open="$emit('update:open', $event)"
   >
-    <!-- Step 1: choose a photo -->
+    <!-- Step 1: choose photos (they are prepared in the background) -->
     <div v-if="vm.step.value === 'pick'">
       <label
         class="flex h-[360px] cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-colors duration-200"
@@ -25,51 +26,35 @@ const vm = useAddDialog(props, emit)
         @dragleave="vm.setDragging(false)"
         @drop.prevent="vm.onDrop"
       >
-        <Icon name="lucide:image-plus" class="size-8 text-rose" />
-        <span class="font-display text-2xl text-ink">Drop a photo of your piece</span>
-        <span class="text-sm text-taupe">or <span class="text-rose underline underline-offset-4">browse your files</span></span>
-        <input type="file" accept="image/*" class="sr-only" aria-label="Choose a photo" @change="vm.onInputChange" >
+        <template v-if="vm.queuing.value">
+          <Icon name="lucide:loader-circle" class="size-8 animate-spin text-rose" />
+          <span class="font-display text-2xl text-ink">Handing them to Dardar…</span>
+        </template>
+        <template v-else>
+          <Icon name="lucide:image-plus" class="size-8 text-rose" />
+          <span class="font-display text-2xl text-ink">Drop photos of your pieces</span>
+          <span class="text-sm text-taupe">or <span class="text-rose underline underline-offset-4">browse your files</span> — add as many as you like</span>
+        </template>
+        <input type="file" accept="image/*" multiple class="sr-only" aria-label="Choose photos" @change="vm.onInputChange" >
       </label>
       <p v-if="vm.photoError.value" role="alert" class="mt-3 text-sm text-rose">{{ vm.photoError.value }}</p>
     </div>
 
-    <!-- Step 2: background removal -->
-    <div v-else-if="vm.step.value === 'processing'" class="flex h-[360px] flex-col items-center justify-center gap-4" aria-live="polite">
-      <div class="relative size-56 overflow-hidden rounded-2xl bg-surface p-4">
-        <img v-if="vm.originalImage.value" :src="vm.originalImage.value" alt="" class="h-full w-full object-contain opacity-70" >
-        <Icon v-else name="lucide:shirt" class="absolute inset-0 m-auto size-14 text-blush" />
-        <div class="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgb(243_227_225/0.9),transparent)] animate-[shimmer_1.4s_ease-in-out_infinite]" />
-      </div>
-      <p class="flex items-center gap-2 font-display text-2xl text-ink">
-        <Icon name="lucide:loader-circle" class="size-5 animate-spin text-rose" /> Removing background…
-      </p>
-      <p class="text-sm text-taupe">Isolating your garment</p>
-    </div>
-
-    <!-- Step 3: details -->
+    <!-- Step 2: review a prepared photo -->
     <form v-else class="grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-8" novalidate @submit.prevent="vm.submit">
       <div class="flex flex-col">
         <div class="flex min-h-[340px] flex-1 items-center justify-center rounded-2xl bg-surface p-8">
-          <img :src="vm.cleanImage.value" alt="Your garment, background removed" class="garment max-h-[360px] w-full" data-testid="clean-preview" >
+          <img :src="vm.cleanImage.value" alt="Your garment, cut out" class="garment max-h-[360px] w-full" data-testid="clean-preview" >
         </div>
-        <button type="button" class="mt-3 self-start text-sm text-taupe underline-offset-4 hover:text-ink hover:underline" @click="vm.startOver">
-          Use a different photo
+        <button type="button" class="mt-3 self-start text-sm text-taupe underline-offset-4 hover:text-ink hover:underline" @click="vm.discardPhoto">
+          Discard this photo
         </button>
         <p v-if="vm.photoError.value" class="mt-2 text-xs text-rose">{{ vm.photoError.value }}</p>
       </div>
 
       <div class="flex flex-col gap-4">
-        <p v-if="vm.suggesting.value" class="flex items-center gap-2 text-xs text-taupe" aria-live="polite" data-testid="suggesting">
-          <Icon name="lucide:sparkles" class="size-3.5 animate-pulse text-rose" /> Your stylist is looking at this piece…
-        </p>
-        <p
-          v-else-if="vm.suggestionNote.value"
-          class="flex items-center gap-2 text-xs"
-          :class="vm.suggested.value ? 'text-rose' : 'text-taupe'"
-          aria-live="polite"
-          data-testid="suggestion-note"
-        >
-          <Icon :name="vm.suggested.value ? 'lucide:sparkles' : 'lucide:info'" class="size-3.5" /> {{ vm.suggestionNote.value }}
+        <p v-if="vm.suggestionNote.value" class="flex items-center gap-2 text-xs text-rose" aria-live="polite" data-testid="suggestion-note">
+          <Icon name="lucide:sparkles" class="size-3.5" /> {{ vm.suggestionNote.value }}
         </p>
         <ItemDetailsForm :form="vm.itemForm" />
 

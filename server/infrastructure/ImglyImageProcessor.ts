@@ -14,11 +14,16 @@ interface Imgly {
  * in an installed app, so the path is taken from the package actually loaded.
  */
 export function imglyPublicPath(): string {
+  return `${pathToFileURL(imglyDist()).href}/`
+}
+
+/** The imgly package's dist folder (model files and the ESM entry, index.mjs). */
+export function imglyDist(): string {
   const pkg = '@imgly/background-removal-node'
   // Node's own module search paths, so it works whichever entry (cjs/mjs) the bundle kept.
   for (const nodeModules of createRequire(import.meta.url).resolve.paths(pkg) ?? []) {
     const dist = join(nodeModules, pkg, 'dist')
-    if (existsSync(join(dist, 'resources.json'))) return `${pathToFileURL(dist).href}/`
+    if (existsSync(join(dist, 'resources.json'))) return dist
   }
   throw new Error(`Background removal model files not found (${pkg}).`)
 }

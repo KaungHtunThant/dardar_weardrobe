@@ -1,137 +1,134 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, reactive } from 'vue'
-import { flushPromises } from '@vue/test-utils'
+import type { Upload } from '#shared/models/upload'
 import { useAddDialog } from '~/services/components/item/AddDialog.service'
+import { useUploadsStore } from '~/stores/uploads'
 import { useWardrobeStore } from '~/stores/wardrobe'
-import { useGateway } from '~/gateways/provider'
 import { setupTestGateway } from '../../../helpers'
 
-const photo = () => new File([new Uint8Array([1, 2, 3])], 'tee.png', { type: 'image/png' })
+const photo = (name = 'tee.png') => new File([new Uint8Array([137, 80, 78, 71])], name, { type: 'image/png' })
 
-function setup(defaultCategory?: 'tops' | 'bags') {
-  const props = reactive({ open: true, defaultCategory })
+function setup(over: { defaultCategory?: 'tops' | 'bags' | 'shoes'; upload?: Upload | null } = {}) {
+  const props = reactive({ open: true, defaultCategory: over.defaultCategory, upload: over.upload ?? null })
   const emit = vi.fn()
   const vm = useAddDialog(props, emit)
   return { props, emit, vm }
 }
 
-async function toDetails(vm: ReturnType<typeof setup>['vm']) {
-  const pending = vm.onFiles([photo()])
-  expect(vm.step.value).toBe('processing')
-  await pending
-  await flushPromises()
+/** A photo the queue has prepared. */
+async function readyUpload(suggestion: Upload['suggestion'] = {}, over: Partial<Upload> = {}) {
+  const store = useUploadsStore()
+  const [u] = await store.enqueue([photo()], over.categoryHint ?? undefined)
+  for (let i = 0; i < 50 && store.uploads.find((x) => x.id === u!.id)!.state !== 'ready'; i++) {
+    await new Promise((r) => setTimeout(r, 5))
+    await store.refresh()
+  }
+  const ready = store.uploads.find((x) => x.id === u!.id)!
+  return { ...ready, suggestion, ...over }
 }
 
 describe('AddDialog service', () => {
+  let gateway: ReturnType<typeof setupTestGateway>
   beforeEach(() => {
-    setupTestGateway()
+    gateway = setupTestGateway()
   })
+  afterEach(() => useUploadsStore().stop())
 
-  it('starts at the photo step with the default category pre-selected', () => {
-    const { vm } = setup('bags')
-    expect(vm.step.value).toBe('pick')
-    expect(vm.form.category).toBe('bags')
-  })
-
-  it('processes a photo: shows the clean image and moves on to details', async () => {
-    const { vm } = setup()
-    await toDetails(vm)
-    expect(vm.step.value).toBe('details')
-    expect(vm.cleanImage.value).toMatch(/^data:image\/png;base64,/)
-  })
-
-  it('previews the chosen photo while processing', async () => {
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
-    const { vm } = setup()
-    const pending = vm.onFiles([photo()])
-    expect(vm.originalImage.value).toBe('blob:preview')
-    await pending
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview')
-    vi.restoreAllMocks()
-  })
-
-  it('rejects files that are not images', async () => {
-    const { vm } = setup()
-    await vm.onFiles([new File(['x'], 'notes.txt', { type: 'text/plain' })])
-    expect(vm.step.value).toBe('pick')
-    expect(vm.photoError.value).toBe('Please choose an image file.')
-  })
-
-  it('shows field errors instead of saving invalid details', async () => {
-    const { vm, emit } = setup()
-    await toDetails(vm)
-    await vm.submit()
-    expect(vm.errors.value.name).toBe('Give this piece a name')
-    expect(vm.errors.value.category).toBe('Choose a category')
-    expect(emit).not.toHaveBeenCalledWith('saved', expect.anything())
-  })
-
-  it('saves the item with the clean image and closes', async () => {
-    const { vm, emit } = setup('tops')
-    await toDetails(vm)
-    vm.form.name = 'Striped Tee'
-    vm.form.colors = 'navy,  white, '
-    vm.toggle('seasons', 'summer')
-    vm.toggle('occasions', 'casual')
-    vm.toggle('occasions', 'work')
-    vm.toggle('occasions', 'work')
-    await vm.submit()
-
-    const store = useWardrobeStore()
-    const saved = store.items[0]!
-    expect(saved).toMatchObject({
-      name: 'Striped Tee',
-      category: 'tops',
-      colors: ['navy', 'white'],
-      seasons: ['summer'],
-      occasions: ['casual'],
+  describe('adding photos', () => {
+    it('starts at the photo step', () => {
+      const { vm } = setup({ defaultCategory: 'bags' })
+      expect(vm.step.value).toBe('pick')
     })
-    expect(saved.cleanImage).toMatch(/^data:image\/png;base64,/)
-    expect(emit).toHaveBeenCalledWith('saved', saved)
-    expect(emit).toHaveBeenCalledWith('update:open', false)
-  })
 
-  it('starts fresh when the dialog is reopened', async () => {
-    const { vm, props } = setup('tops')
-    await toDetails(vm)
-    vm.form.name = 'Draft'
-    props.open = false
-    await nextTick()
-    props.defaultCategory = 'bags'
-    props.open = true
-    await nextTick()
-    expect(vm.step.value).toBe('pick')
-    expect(vm.form.name).toBe('')
-    expect(vm.form.category).toBe('bags')
-  })
-
-  it('pre-fills empty fields from the stylist without overwriting what you typed', async () => {
-    vi.spyOn(useGateway(), 'suggestDetails').mockResolvedValue({
-      name: 'Blush Silk Blouse',
-      category: 'tops',
-      colors: ['blush', 'cream'],
-      seasons: ['spring'],
-      occasions: ['work'],
+    it('queues every chosen photo with the closet it came from, then closes so you can carry on', async () => {
+      const spy = vi.spyOn(gateway, 'enqueuePhotos')
+      const { vm, emit } = setup({ defaultCategory: 'shoes' })
+      await vm.onFiles([photo('a.png'), photo('b.png')])
+      expect(spy).toHaveBeenCalledWith([expect.any(File), expect.any(File)], { categoryHint: 'shoes' })
+      expect(useUploadsStore().uploads).toHaveLength(2)
+      expect(emit).toHaveBeenCalledWith('queued', 2)
+      expect(emit).toHaveBeenCalledWith('update:open', false)
     })
-    const { vm } = setup('bags')
-    vm.form.name = 'My Blouse'
-    await toDetails(vm)
-    await flushPromises()
-    expect(vm.form.name).toBe('My Blouse')
-    expect(vm.form.category).toBe('bags')
-    expect(vm.form.colors).toBe('blush, cream')
-    expect(vm.form.seasons).toEqual(['spring'])
-    expect(vm.suggested.value).toBe(true)
-    expect(vm.suggesting.value).toBe(false)
+
+    it('rejects files that are not images and queues nothing', async () => {
+      const spy = vi.spyOn(gateway, 'enqueuePhotos')
+      const { vm, emit } = setup()
+      await vm.onFiles([photo(), new File(['x'], 'notes.txt', { type: 'text/plain' })])
+      expect(vm.photoError.value).toBe('Please choose image files only.')
+      expect(spy).not.toHaveBeenCalled()
+      expect(emit).not.toHaveBeenCalledWith('update:open', false)
+    })
+
+    it('shows what went wrong if the photos could not be queued', async () => {
+      vi.spyOn(gateway, 'enqueuePhotos').mockRejectedValueOnce(new Error('That photo is too large (20 MB max).'))
+      const { vm } = setup()
+      await vm.onFiles([photo()])
+      expect(vm.photoError.value).toBe('That photo is too large (20 MB max).')
+      expect(vm.queuing.value).toBe(false)
+    })
   })
 
-  it('keeps going quietly when no suggestion is possible', async () => {
-    vi.spyOn(useGateway(), 'suggestDetails').mockRejectedValue(new Error('CLI missing'))
-    const { vm } = setup()
-    await toDetails(vm)
-    await flushPromises()
-    expect(vm.suggested.value).toBe(false)
-    expect(vm.suggestionNote.value).toMatch(/fill in the details/i)
+  describe('reviewing a prepared photo', () => {
+    it("opens on the details with the cut-out and the stylist's suggestions", async () => {
+      const upload = await readyUpload({ name: 'Blush Silk Blouse', category: 'tops', colors: ['blush', 'cream'], seasons: ['spring'], occasions: ['work'] })
+      const { vm } = setup({ upload })
+      expect(vm.step.value).toBe('details')
+      expect(vm.cleanImage.value).toBe(upload.cleanImage)
+      expect(vm.form).toMatchObject({ name: 'Blush Silk Blouse', category: 'tops', colors: 'blush, cream', seasons: ['spring'], occasions: ['work'] })
+      expect(vm.suggestionNote.value).toMatch(/Suggested by Dardar/)
+    })
+
+    it("uses the closet's category when the stylist couldn't tell", async () => {
+      const upload = await readyUpload({}, { categoryHint: 'shoes' })
+      const { vm } = setup({ upload })
+      expect(vm.form.category).toBe('shoes')
+      expect(vm.suggestionNote.value).toBeNull()
+    })
+
+    it('says so when the garment could not be cut out', async () => {
+      const upload = await readyUpload({}, { backgroundRemoved: false })
+      expect(setup({ upload }).vm.photoError.value).toMatch(/couldn.t cut/)
+    })
+
+    it('shows field errors instead of saving invalid details', async () => {
+      const upload = await readyUpload()
+      const { vm, emit } = setup({ upload })
+      await vm.submit()
+      expect(vm.errors.value.name).toBe('Give this piece a name')
+      expect(emit).not.toHaveBeenCalledWith('saved', expect.anything())
+    })
+
+    it('saves the piece from the prepared photo and closes', async () => {
+      const upload = await readyUpload({ category: 'tops' })
+      const { vm, emit } = setup({ upload })
+      vm.form.name = 'Striped Tee'
+      vm.form.colors = 'navy,  white, '
+      vm.toggle('seasons', 'summer')
+      await vm.submit()
+      const saved = useWardrobeStore().items.find((i) => i.name === 'Striped Tee')!
+      expect(saved).toMatchObject({ category: 'tops', colors: ['navy', 'white'], seasons: ['summer'], cleanImage: upload.cleanImage })
+      expect(useUploadsStore().uploads).toEqual([])
+      expect(emit).toHaveBeenCalledWith('saved', saved)
+      expect(emit).toHaveBeenCalledWith('update:open', false)
+    })
+
+    it('can throw the photo away instead', async () => {
+      const upload = await readyUpload()
+      const { vm, emit } = setup({ upload })
+      await vm.discardPhoto()
+      expect(useUploadsStore().uploads).toEqual([])
+      expect(emit).toHaveBeenCalledWith('update:open', false)
+    })
+
+    it('fills the form again for the next photo', async () => {
+      const first = await readyUpload({ name: 'First' })
+      const second = await readyUpload({ name: 'Second' })
+      const { vm, props } = setup({ upload: first })
+      vm.form.colors = 'draft'
+      props.upload = second
+      await nextTick()
+      expect(vm.form.name).toBe('Second')
+      expect(vm.form.colors).toBe('')
+    })
   })
 })

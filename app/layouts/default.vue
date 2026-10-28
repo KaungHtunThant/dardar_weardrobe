@@ -33,5 +33,7 @@ const vm = useDefaultLayout()
     <main id="main" class="relative min-h-0 flex-1 overflow-y-auto">
       <slot />
     </main>
+
+    <UploadTray />
   </div>
 </template>

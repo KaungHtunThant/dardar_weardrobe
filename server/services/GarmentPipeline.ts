@@ -2,6 +2,7 @@ import { NO_ANALYSIS, type GarmentAnalysis, type GarmentAnalyst } from '#shared/
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { ImageProcessor } from '#shared/contracts/ImageProcessor'
 import type { ImageStore, StoredImage } from '#shared/contracts/ImageStore'
+import type { CategoryId } from '#shared/models/category'
 import { ValidationError } from '#shared/errors'
 
 export type PipelineStage = 'analyzing' | 'isolating'
@@ -45,7 +46,11 @@ export class GarmentPipeline {
     ;(this.o.log ?? ((m, e) => console.warn(`[dardar] ${m}`, e ?? '')))(message, error)
   }
 
-  async prepare(originalImage: string, { signal, onStage }: { signal?: AbortSignal; onStage?: (stage: PipelineStage) => void } = {}): Promise<PreparedGarment> {
+  /** `categoryHint` (the closet it was added from) is used when the stylist can't tell the category. */
+  async prepare(
+    originalImage: string,
+    { signal, onStage, categoryHint }: { signal?: AbortSignal; onStage?: (stage: PipelineStage) => void; categoryHint?: CategoryId } = {},
+  ): Promise<PreparedGarment> {
     const original = await this.o.images.read(originalImage)
     if (!original) throw new ValidationError('Upload a photo first.')
 
@@ -60,7 +65,7 @@ export class GarmentPipeline {
       const clean = await this.o.processor.removeBackground(original.bytes, original.mimeType, {
         focus: analysis.focus,
         worn: analysis.worn,
-        category: analysis.details.category,
+        category: analysis.details.category ?? categoryHint,
       })
       signal?.throwIfAborted()
       cleanImage = await this.o.images.save(clean.bytes, clean.mimeType)

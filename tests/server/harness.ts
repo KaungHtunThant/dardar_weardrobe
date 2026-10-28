@@ -32,7 +32,7 @@ export async function startApi(seed?: { items: Item[]; styleMatches: StyleMatch[
     container,
     async stop() {
       await new Promise((resolve) => server.close(resolve))
-      container.close()
+      await container.close()
       rmSync(dataDir, { recursive: true, force: true })
     },
   }

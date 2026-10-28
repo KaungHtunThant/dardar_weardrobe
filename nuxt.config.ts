@@ -1,4 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
+// sharp's native module must be loaded by the main thread before a worker thread loads it,
+// and `nuxt dev` runs the API (which uses sharp) in a worker thread.
+import 'sharp'
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',

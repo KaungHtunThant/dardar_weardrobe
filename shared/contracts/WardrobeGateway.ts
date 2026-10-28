@@ -1,4 +1,6 @@
 import type { DetailsSuggestion } from './GarmentTagger'
+import type { CategoryId } from '../models/category'
+import type { Upload } from '../models/upload'
 import type { Item, ItemDetailsInput } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
 import type { StyleRequestInput } from '../models/styleRequest'
@@ -31,6 +33,18 @@ export interface PhotoGateway {
   removeBackground(photo: Blob): Promise<ProcessedPhoto>
 }
 
+/** Photos prepared in the background so the user can carry on (see Upload). */
+export interface UploadGateway {
+  /** Saves the photos and queues them; resolves at once. `categoryHint`: the closet they were added from. */
+  enqueuePhotos(photos: Blob[], options?: { categoryHint?: CategoryId }): Promise<Upload[]>
+  /** Oldest first, with their progress. */
+  listUploads(): Promise<Upload[]>
+  retryUpload(id: string): Promise<Upload>
+  discardUpload(id: string): Promise<void>
+  /** Turns a ready photo into a piece with the user's details. */
+  saveUpload(id: string, details: ItemDetailsInput): Promise<Item>
+}
+
 export interface StyleMatchGateway {
   listStyleMatches(): Promise<StyleMatch[]>
   /** Today's recommendation for a YYYY-MM-DD date (null with an empty wardrobe). */
@@ -60,4 +74,4 @@ export interface DataGateway {
 }
 
 /** Everything the frontend needs from the outside world. Stores depend on this, never on an implementation. */
-export interface WardrobeGateway extends ItemGateway, PhotoGateway, StyleMatchGateway, StylingGateway, SettingsGateway, DataGateway {}
+export interface WardrobeGateway extends ItemGateway, PhotoGateway, UploadGateway, StyleMatchGateway, StylingGateway, SettingsGateway, DataGateway {}

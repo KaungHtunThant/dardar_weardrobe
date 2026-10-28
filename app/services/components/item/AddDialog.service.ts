@@ -1,74 +1,99 @@
 import { computed, ref, watch } from 'vue'
 import type { CategoryId } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
-import { useWardrobeStore } from '~/stores/wardrobe'
+import type { Upload } from '#shared/models/upload'
+import { useUploadsStore } from '~/stores/uploads'
 import { createItemForm } from '~/services/shared/itemForm'
-import { createPhotoUpload } from '~/services/shared/photoUpload'
 
-export type AddStep = 'pick' | 'processing' | 'details'
+export type AddStep = 'pick' | 'details'
 
 interface Emit {
   (event: 'update:open', open: boolean): void
   (event: 'saved', item: Item): void
+  (event: 'queued', count: number): void
 }
 
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
 /**
- * Add-item flow: pick a photo → background removal → details (pre-filled by the stylist) → save.
+ * Add pieces in two moments: pick photos (they are queued and prepared in the background, so the
+ * dialog closes at once), then, when a photo is ready, review the details Dardar suggested and save.
  */
-export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryId }, emit: Emit) {
-  const wardrobe = useWardrobeStore()
+export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryId; upload?: Upload | null }, emit: Emit) {
+  const uploads = useUploadsStore()
   const itemForm = createItemForm(props.defaultCategory)
-  const upload = createPhotoUpload((file) => wardrobe.prepareImage(file), (photo) => void prefill(photo.cleanImage))
+  const photoError = ref<string | null>(null)
+  const dragging = ref(false)
+  const queuing = ref(false)
   const saving = ref(false)
-  const suggesting = ref(false)
-  const suggested = ref(false)
   const suggestionNote = ref<string | null>(null)
-  /** Bumped on every new photo / reset so a late suggestion never fills the wrong form. */
-  let attempt = 0
 
-  const step = computed<AddStep>(() => (upload.stage.value === 'ready' ? 'details' : upload.stage.value))
+  const step = computed<AddStep>(() => (props.upload ? 'details' : 'pick'))
+  const cleanImage = computed(() => props.upload?.cleanImage ?? props.upload?.originalImage ?? '')
+  const description = computed(() =>
+    step.value === 'pick'
+      ? 'Add photos of your pieces. Dardar cuts each garment out and suggests its details while you carry on.'
+      : 'Dardar has prepared this piece. Check the details and save it.',
+  )
 
+  /** A fresh form for the photo under review, pre-filled with the stylist's suggestion. */
   function reset() {
-    attempt++
-    suggesting.value = false
-    suggested.value = false
-    suggestionNote.value = null
+    photoError.value = null
+    dragging.value = false
+    queuing.value = false
     saving.value = false
-    upload.reset()
-    itemForm.reset(props.defaultCategory)
+    suggestionNote.value = null
+    const upload = props.upload
+    itemForm.reset(upload?.categoryHint ?? props.defaultCategory)
+    if (!upload) return
+    // The stylist's category wins over the closet the photo was added from.
+    if (upload.suggestion?.category) itemForm.form.category = null
+    if (itemForm.applySuggestion(upload.suggestion ?? {})) suggestionNote.value = 'Suggested by Dardar. Check and adjust.'
+    if (!itemForm.form.category) itemForm.form.category = upload.categoryHint ?? props.defaultCategory ?? null
+    if (!upload.backgroundRemoved) photoError.value = "We couldn't cut the garment out, so the original photo is used."
   }
+  reset()
 
   watch(
-    () => props.open,
-    (open) => {
+    () => [props.open, props.upload?.id],
+    ([open]) => {
       if (open) reset()
     },
   )
 
-  /** Asks the stylist about the photo and fills only the fields the user hasn't touched. */
-  async function prefill(image: string) {
-    const mine = ++attempt
-    suggesting.value = true
-    suggested.value = false
-    suggestionNote.value = null
+  async function onFiles(files: FileList | readonly File[] | null | undefined) {
+    const list = [...(files ?? [])]
+    if (!list.length) return
+    if (list.some((f) => !f.type.startsWith('image/'))) {
+      photoError.value = 'Please choose image files only.'
+      return
+    }
+    photoError.value = null
+    queuing.value = true
     try {
-      const s = await wardrobe.suggestDetails(image)
-      if (mine !== attempt) return
-      const filled = itemForm.applySuggestion(s)
-      suggested.value = filled
-      suggestionNote.value = filled ? 'Suggested by your stylist. Check and adjust.' : null
-    } catch {
-      if (mine === attempt) suggestionNote.value = "Couldn't suggest details. Please fill in the details yourself."
+      await uploads.enqueue(list, props.defaultCategory)
+      emit('queued', list.length)
+      emit('update:open', false)
+    } catch (e) {
+      photoError.value = message(e)
     } finally {
-      if (mine === attempt) suggesting.value = false
+      queuing.value = false
     }
   }
 
-  function startOver() {
-    attempt++
-    suggesting.value = false
-    suggestionNote.value = null
-    upload.reset()
+  function onInputChange(event: Event) {
+    const input = event.target as HTMLInputElement
+    void onFiles(input.files)
+    input.value = ''
+  }
+
+  function onDrop(event: DragEvent) {
+    dragging.value = false
+    void onFiles(event.dataTransfer?.files)
+  }
+
+  function setDragging(value: boolean) {
+    dragging.value = value
   }
 
   function close() {
@@ -76,20 +101,25 @@ export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryI
   }
 
   async function submit() {
+    const upload = props.upload
     const details = itemForm.validate()
-    if (!details) return
+    if (!upload || !details) return
     saving.value = true
     try {
-      const item = await wardrobe.addItem({
-        ...details,
-        originalImage: upload.originalImage.value,
-        cleanImage: upload.cleanImage.value,
-      })
+      const item = await uploads.save(upload.id, details)
       emit('saved', item)
       emit('update:open', false)
+    } catch (e) {
+      photoError.value = message(e)
     } finally {
       saving.value = false
     }
+  }
+
+  async function discardPhoto() {
+    if (!props.upload) return
+    await uploads.discard(props.upload.id)
+    emit('update:open', false)
   }
 
   return {
@@ -100,19 +130,18 @@ export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryI
     toggle: itemForm.toggle,
     setCategory: itemForm.setCategory,
     step,
-    originalImage: upload.originalImage,
-    cleanImage: upload.cleanImage,
-    photoError: upload.photoError,
-    dragging: upload.dragging,
-    onFiles: upload.onFiles,
-    onInputChange: upload.onInputChange,
-    onDrop: upload.onDrop,
-    setDragging: upload.setDragging,
+    description,
+    cleanImage,
+    photoError,
+    dragging,
+    queuing,
+    onFiles,
+    onInputChange,
+    onDrop,
+    setDragging,
     saving,
-    suggesting,
-    suggested,
     suggestionNote,
-    startOver,
+    discardPhoto,
     close,
     submit,
   }

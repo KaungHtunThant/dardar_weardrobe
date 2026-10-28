@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ItemRepository } from '#shared/contracts/ItemRepository'
 import type { StyleMatchRepository } from '#shared/contracts/StyleMatchRepository'
+import type { UploadRepository } from '#shared/contracts/UploadRepository'
+import type { Upload } from '#shared/models/upload'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
 
 /** Behaviour every ItemRepository must share. */
@@ -90,6 +92,57 @@ export function styleMatchRepositoryContract(name: string, make: () => StyleMatc
       for (const look of seedStyleMatches) await repo.insert(look)
       expect(await repo.findAll()).toHaveLength(seedStyleMatches.length)
       expect(await repo.findById('nope')).toBeNull()
+    })
+  })
+}
+
+const upload = (id: string, createdAt: string, over: Partial<Upload> = {}): Upload => ({
+  id,
+  originalImage: `/api/images/${id}.jpg`,
+  cleanImage: null,
+  state: 'queued',
+  stage: null,
+  categoryHint: null,
+  suggestion: null,
+  backgroundRemoved: false,
+  error: null,
+  createdAt,
+  ...over,
+})
+
+/** Behaviour every UploadRepository must share. */
+export function uploadRepositoryContract(name: string, make: () => UploadRepository) {
+  describe(`UploadRepository contract: ${name}`, () => {
+    it('stores uploads unchanged and lists them oldest first', async () => {
+      const repo = make()
+      const later = upload('b', '2026-10-29T10:00:01.000Z', { categoryHint: 'shoes' })
+      const first = upload('a', '2026-10-29T10:00:00.000Z')
+      await repo.insert(later)
+      await repo.insert(first)
+      expect(await repo.findAll()).toEqual([first, later])
+      expect(await repo.findById('b')).toEqual(later)
+      expect(await repo.findById('nope')).toBeNull()
+    })
+
+    it('updates progress and results', async () => {
+      const repo = make()
+      await repo.insert(upload('a', '2026-10-29T10:00:00.000Z'))
+      const ready = upload('a', '2026-10-29T10:00:00.000Z', {
+        state: 'ready',
+        cleanImage: '/api/images/a-clean.png',
+        suggestion: { name: 'Red Tee', category: 'tops', colors: ['red'] },
+        backgroundRemoved: true,
+      })
+      await repo.update(ready)
+      expect(await repo.findById('a')).toEqual(ready)
+    })
+
+    it('deletes uploads', async () => {
+      const repo = make()
+      await repo.insert(upload('a', '2026-10-29T10:00:00.000Z'))
+      expect(await repo.delete('a')).toBe(true)
+      expect(await repo.delete('a')).toBe(false)
+      expect(await repo.findAll()).toEqual([])
     })
   })
 }

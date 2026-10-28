@@ -2,6 +2,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { DEFAULT_MODEL, type AdvisorMode, type Settings } from '#shared/models/settings'
 import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
+import { useUploadsStore } from '~/stores/uploads'
 import { useWardrobeStore } from '~/stores/wardrobe'
 import { onViewMounted } from '~/services/lifecycle'
 
@@ -165,6 +166,7 @@ export function useSettingsPage() {
     try {
       await useWardrobeStore().clearAll()
       useStyleMatchesStore().forget()
+      useUploadsStore().forget()
       clearOpen.value = false
       flash('Your wardrobe is fresh and empty.')
     } catch (e) {

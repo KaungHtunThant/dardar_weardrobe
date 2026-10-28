@@ -5,6 +5,7 @@ import { ItemController } from '../controllers/ItemController'
 import { LookController } from '../controllers/LookController'
 import { PhotoController } from '../controllers/PhotoController'
 import { SettingsController } from '../controllers/SettingsController'
+import { UploadController } from '../controllers/UploadController'
 import { WardrobeController } from '../controllers/WardrobeController'
 import { toHttpError } from './errors'
 
@@ -24,6 +25,7 @@ const handle = (fn: (event: H3Event) => unknown) =>
 export function createApiRouter(c: Container) {
   const items = new ItemController(c.items, c.tagging)
   const photos = new PhotoController(c.photos)
+  const uploads = new UploadController(c.uploads)
   const images = new ImageController(c.images)
   const looks = new LookController(c.looks, c.styling, c.today)
   const settings = new SettingsController(c.settings)
@@ -37,6 +39,11 @@ export function createApiRouter(c: Container) {
     .put('/api/items/:id/photo', handle((e) => items.replacePhoto(e)))
     .delete('/api/items/:id', handle((e) => items.delete(e)))
     .post('/api/photos', handle((e) => photos.upload(e)))
+    .get('/api/uploads', handle(() => uploads.list()))
+    .post('/api/uploads', handle((e) => uploads.enqueue(e)))
+    .post('/api/uploads/:id/retry', handle((e) => uploads.retry(e)))
+    .post('/api/uploads/:id/save', handle((e) => uploads.save(e)))
+    .delete('/api/uploads/:id', handle((e) => uploads.discard(e)))
     .get('/api/images/:id', handle((e) => images.show(e)))
     .get('/api/looks', handle(() => looks.list()))
     .get('/api/looks/today', handle((e) => looks.today(e)))

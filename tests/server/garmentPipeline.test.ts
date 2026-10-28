@@ -75,6 +75,14 @@ describe('GarmentPipeline', () => {
     expect(out).toMatchObject({ backgroundRemoved: true, suggestion: {} })
   })
 
+  it("uses the closet's category when the stylist can't tell", async () => {
+    const { seen, processor } = recorder()
+    const original = await images.save(PNG, 'image/png')
+    const unsure: GarmentAnalyst = { analyze: async () => ({ focus: null, worn: false, details: {} }) }
+    await new GarmentPipeline({ images, processor, analyst: async () => unsure }).prepare(original, { categoryHint: 'shoes' })
+    expect(seen.hints!.category).toBe('shoes')
+  })
+
   it('keeps the original when cutting out fails', async () => {
     const { analyst } = recorder()
     const original = await images.save(PNG, 'image/png')

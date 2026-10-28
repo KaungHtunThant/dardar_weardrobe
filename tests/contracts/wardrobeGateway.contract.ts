@@ -52,6 +52,47 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       await expect(gw.createItem({ name: '', category: 'tops', ...processed })).rejects.toThrow()
     })
 
+    /** Polls like the app does until no photo is waiting or being prepared. */
+    async function settled(gw: WardrobeGateway) {
+      for (let i = 0; i < 200; i++) {
+        const uploads = await gw.listUploads()
+        if (uploads.every((u) => u.state === 'ready' || u.state === 'failed')) return uploads
+        await new Promise((r) => setTimeout(r, 10))
+      }
+      throw new Error('uploads never settled')
+    }
+
+    it('queues photos at once and prepares them in the background, with valid suggestions', async () => {
+      const gw = await fresh()
+      const queued = await gw.enqueuePhotos([photo(), photo()], { categoryHint: 'tops' })
+      expect(queued).toHaveLength(2)
+      for (const u of queued) expect(['queued', 'processing']).toContain(u.state)
+      expect(queued[0]!.categoryHint).toBe('tops')
+      const ready = await settled(gw)
+      expect(ready.map((u) => u.state)).toEqual(['ready', 'ready'])
+      for (const u of ready) {
+        expect(u.cleanImage).toBeTruthy()
+        expect(() => ItemDetailsSchema.partial().parse(u.suggestion ?? {})).not.toThrow()
+      }
+    })
+
+    it('saves a prepared photo as a piece, and discards another', async () => {
+      const gw = await fresh()
+      await gw.enqueuePhotos([photo(), photo()])
+      const [first, second] = await settled(gw)
+      await expect(gw.saveUpload(first!.id, { name: '', category: 'tops' })).rejects.toThrow()
+      const item = await gw.saveUpload(first!.id, { name: 'Silk Cami', category: 'tops' })
+      expect(item).toMatchObject({ name: 'Silk Cami', cleanImage: first!.cleanImage })
+      expect((await gw.listItems()).some((i) => i.id === item.id)).toBe(true)
+      await gw.discardUpload(second!.id)
+      expect(await gw.listUploads()).toEqual([])
+    })
+
+    it('refuses to queue something that is not a photo', async () => {
+      const gw = await fresh()
+      await expect(gw.enqueuePhotos([new Blob(['x'], { type: 'text/plain' })])).rejects.toThrow()
+    })
+
     it('suggests details for an uploaded photo (possibly nothing, never invalid values)', async () => {
       const gw = await fresh()
       const { cleanImage } = await gw.removeBackground(photo())

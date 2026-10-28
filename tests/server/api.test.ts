@@ -40,6 +40,29 @@ describe('API', () => {
     expect(await status(ofetch(`${api.baseURL}/api/nothing-here`))).toBe(404)
   })
 
+  it('queues uploaded photos, prepares them in the background and saves one as a piece', async () => {
+    api = await startApi(seed())
+    const form = new FormData()
+    form.append('photo', new Blob([PNG], { type: 'image/png' }), 'a.png')
+    form.append('photo', new Blob([PNG], { type: 'image/png' }), 'b.png')
+    form.append('category', 'shoes')
+    const res = await ofetch.raw(`${api.baseURL}/api/uploads`, { method: 'POST', body: form })
+    expect(res.status).toBe(202)
+    expect(res._data).toHaveLength(2)
+    expect(res._data[0]).toMatchObject({ state: 'queued', categoryHint: 'shoes' })
+
+    await api.container.uploads.idle()
+    const uploads = await ofetch(`${api.baseURL}/api/uploads`)
+    expect(uploads.map((u: { state: string }) => u.state)).toEqual(['ready', 'ready'])
+
+    const item = await ofetch(`${api.baseURL}/api/uploads/${uploads[0].id}/save`, { method: 'POST', body: { name: 'Loafers', category: 'shoes' } })
+    expect(item).toMatchObject({ name: 'Loafers', cleanImage: uploads[0].cleanImage })
+    await ofetch(`${api.baseURL}/api/uploads/${uploads[1].id}`, { method: 'DELETE' })
+    expect(await ofetch(`${api.baseURL}/api/uploads`)).toEqual([])
+    expect(await status(ofetch(`${api.baseURL}/api/uploads/${uploads[1].id}/retry`, { method: 'POST' }))).toBe(404)
+    expect(await status(ofetch(`${api.baseURL}/api/uploads`, { method: 'POST', body: new FormData() }))).toBe(400)
+  })
+
   it('rejects a photo upload without a file', async () => {
     api = await startApi(seed())
     expect(await status(ofetch(`${api.baseURL}/api/photos`, { method: 'POST', body: new FormData() }))).toBe(400)

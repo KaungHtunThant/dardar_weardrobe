@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { openDatabase } from '../../server/database/connection'
 import { SqliteItemRepository } from '../../server/repositories/SqliteItemRepository'
 import { SqliteStyleMatchRepository } from '../../server/repositories/SqliteStyleMatchRepository'
-import { itemRepositoryContract, styleMatchRepositoryContract } from './repositories.contract'
+import { SqliteUploadRepository } from '../../server/repositories/SqliteUploadRepository'
+import { itemRepositoryContract, styleMatchRepositoryContract, uploadRepositoryContract } from './repositories.contract'
 
 itemRepositoryContract('SqliteItemRepository', () => new SqliteItemRepository(openDatabase(':memory:').db))
 styleMatchRepositoryContract('SqliteStyleMatchRepository', () => new SqliteStyleMatchRepository(openDatabase(':memory:').db))
+uploadRepositoryContract('SqliteUploadRepository', () => new SqliteUploadRepository(openDatabase(':memory:').db))
 
 describe('database', () => {
   it('migrates once and records the schema version', () => {

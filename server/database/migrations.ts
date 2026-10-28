@@ -30,6 +30,18 @@ const MIGRATIONS: string[] = [
      daily_pick_date TEXT,
      created_at TEXT NOT NULL
    );`,
+  `CREATE TABLE uploads (
+     id TEXT PRIMARY KEY,
+     original_image TEXT NOT NULL,
+     clean_image TEXT,
+     state TEXT NOT NULL,
+     stage TEXT,
+     category_hint TEXT,
+     suggestion TEXT,
+     background_removed INTEGER NOT NULL DEFAULT 0,
+     error TEXT,
+     created_at TEXT NOT NULL
+   );`,
 ]
 
 export function migrate(sqlite: DatabaseSync) {

@@ -21,11 +21,12 @@ import { openDatabase } from './database/connection'
 import { FsImageStore } from './infrastructure/FsImageStore'
 import { analysisPreview } from './infrastructure/analysisPreview'
 import { GarmentStudioProcessor } from './infrastructure/GarmentStudioProcessor'
-import { ImglyImageProcessor } from './infrastructure/ImglyImageProcessor'
 import { PassThroughImageProcessor } from './infrastructure/PassThroughImageProcessor'
 import { SegformerClothesSegmenter } from './infrastructure/SegformerClothesSegmenter'
+import { WorkerImglyImageProcessor } from './infrastructure/WorkerImglyImageProcessor'
 import { SqliteItemRepository } from './repositories/SqliteItemRepository'
 import { SqliteStyleMatchRepository } from './repositories/SqliteStyleMatchRepository'
+import { SqliteUploadRepository } from './repositories/SqliteUploadRepository'
 import { systemClock, type Clock } from './services/clock'
 import { seedIfEmpty } from './services/demoSeed'
 import { GarmentPipeline } from './services/GarmentPipeline'
@@ -35,6 +36,7 @@ import { StyleMatchService } from './services/StyleMatchService'
 import { StylingService } from './services/StylingService'
 import { TaggingService } from './services/TaggingService'
 import { TodayService } from './services/TodayService'
+import { UploadService } from './services/UploadService'
 import { FileSecretStore } from './settings/FileSecretStore'
 import { SettingsService, type AdvisorFactory, type AnalystFactory, type TaggerFactory } from './settings/SettingsService'
 import { SettingsStore } from './settings/SettingsStore'
@@ -91,7 +93,8 @@ function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: Ad
 /** The garment studio (local models) in the app; the photo unchanged in tests. */
 function imageProcessor(imaging: ContainerOptions['imaging']): ImageProcessor {
   if (imaging !== 'studio') return new PassThroughImageProcessor()
-  return new GarmentStudioProcessor({ matte: new ImglyImageProcessor(), segmenter: new SegformerClothesSegmenter() })
+  // The background remover runs in a worker thread so the API keeps answering while photos are prepared.
+  return new GarmentStudioProcessor({ matte: new WorkerImglyImageProcessor(), segmenter: new SegformerClothesSegmenter() })
 }
 
 /** Composition root: the only place that knows the concrete server classes. */
@@ -134,9 +137,15 @@ export async function createContainer(options: ContainerOptions) {
     preview: options.imaging === 'studio' ? analysisPreview : undefined,
   })
 
+  const items = new ItemService(itemRepo, lookRepo, images, clock)
+  const uploads = new UploadService({ uploads: new SqliteUploadRepository(database.db), images, pipeline, items, clock })
+  // Photos still waiting when the app last closed are prepared now.
+  await uploads.resume()
+
   return {
-    items: new ItemService(itemRepo, lookRepo, images, clock),
+    items,
     photos: new PhotoService(images, pipeline),
+    uploads,
     looks: new StyleMatchService(lookRepo),
     styling: new StylingService(itemRepo, lookRepo, () => settings.resolveAdvisor(), clock),
     settings,
@@ -146,18 +155,23 @@ export async function createContainer(options: ContainerOptions) {
     allowReset: options.allowReset ?? false,
     /** The user's "start fresh": every item, look and photo goes; settings and the API key stay. */
     async clearWardrobe() {
+      await uploads.stopAll()
       database.clear()
       await images.clear()
       writeFileSync(clearedMarker, new Date().toISOString())
     },
     /** Test-only: back to the demo seed with default settings. */
     async reset() {
+      await uploads.stopAll()
       database.clear()
       settingsStore.clear()
       rmSync(clearedMarker, { force: true })
       return seed()
     },
-    close: database.close,
+    async close() {
+      await uploads.stopAll()
+      database.close()
+    },
   }
 }
 

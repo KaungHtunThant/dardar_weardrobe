@@ -2,6 +2,8 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import type { CategoryId } from '#shared/models/category'
 import type { Occasion, Season } from '#shared/models/item'
 import type { StyleRating } from '#shared/models/styleMatch'
+import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
+import type { UploadStage, UploadState } from '#shared/models/upload'
 
 export const items = sqliteTable('items', {
   id: text('id').primaryKey(),
@@ -29,5 +31,18 @@ export const styleMatches = sqliteTable('style_matches', {
   rating: text('rating', { mode: 'json' }).$type<StyleRating>(),
   isFavourite: integer('is_favourite', { mode: 'boolean' }).notNull(),
   dailyPickDate: text('daily_pick_date'),
+  createdAt: text('created_at').notNull(),
+})
+
+export const uploads = sqliteTable('uploads', {
+  id: text('id').primaryKey(),
+  originalImage: text('original_image').notNull(),
+  cleanImage: text('clean_image'),
+  state: text('state').$type<UploadState>().notNull(),
+  stage: text('stage').$type<UploadStage>(),
+  categoryHint: text('category_hint').$type<CategoryId>(),
+  suggestion: text('suggestion', { mode: 'json' }).$type<DetailsSuggestion>(),
+  backgroundRemoved: integer('background_removed', { mode: 'boolean' }).notNull(),
+  error: text('error'),
   createdAt: text('created_at').notNull(),
 })

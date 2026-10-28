@@ -76,10 +76,30 @@ export const useWardrobeStore = defineStore('wardrobe', () => {
   }
 
   async function addItem(input: CreateItemInput) {
-    const item = await useGateway().createItem(input)
-    raw.value = [...raw.value, item]
+    return adopt(await useGateway().createItem(input))
+  }
+
+  /** A piece created elsewhere (e.g. saved from the upload queue). */
+  function adopt(item: Item) {
+    raw.value = [...raw.value.filter((i) => i.id !== item.id), item]
     return item
   }
 
-  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, suggestDetails, addItem, updateItem, replaceItemPhoto, deleteItem, clearAll }
+  return {
+    items,
+    counts,
+    loaded,
+    loading,
+    error,
+    byCategory,
+    load,
+    prepareImage,
+    suggestDetails,
+    addItem,
+    adopt,
+    updateItem,
+    replaceItemPhoto,
+    deleteItem,
+    clearAll,
+  }
 })

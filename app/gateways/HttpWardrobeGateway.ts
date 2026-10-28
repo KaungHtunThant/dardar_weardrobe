@@ -5,6 +5,8 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { SettingsUpdate, SettingsView } from '#shared/models/settings'
+import type { CategoryId } from '#shared/models/category'
+import type { Upload } from '#shared/models/upload'
 import type { StyleCallOptions, StyleProgress } from '#shared/contracts/StyleAdvisor'
 import { createSseParser } from '#shared/utils/sse'
 
@@ -63,6 +65,30 @@ export class HttpWardrobeGateway implements WardrobeGateway {
     const form = new FormData()
     form.append('photo', photo, (photo as File).name || 'photo')
     return this.call(() => this.api<ProcessedPhoto>('/api/photos', { method: 'POST', body: form }))
+  }
+
+  enqueuePhotos(photos: Blob[], { categoryHint }: { categoryHint?: CategoryId } = {}) {
+    const form = new FormData()
+    for (const photo of photos) form.append('photo', photo, (photo as File).name || 'photo')
+    if (categoryHint) form.append('category', categoryHint)
+    return this.call(() => this.api<Upload[]>('/api/uploads', { method: 'POST', body: form }))
+  }
+
+  /** Polled while photos are prepared; a check that never answers mustn't stop the next one. */
+  listUploads() {
+    return this.call(() => this.api<Upload[]>('/api/uploads', { timeout: 10_000 }))
+  }
+
+  retryUpload(id: string) {
+    return this.call(() => this.api<Upload>(`/api/uploads/${encodeURIComponent(id)}/retry`, { method: 'POST' }))
+  }
+
+  async discardUpload(id: string) {
+    await this.call(() => this.api(`/api/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }))
+  }
+
+  saveUpload(id: string, details: ItemDetailsInput) {
+    return this.call(() => this.api<Item>(`/api/uploads/${encodeURIComponent(id)}/save`, { method: 'POST', body: details }))
   }
 
   listStyleMatches() {
