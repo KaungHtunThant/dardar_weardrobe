@@ -3,6 +3,7 @@ import { nextTick, reactive } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { useAddDialog } from '~/services/components/item/AddDialog.service'
 import { useWardrobeStore } from '~/stores/wardrobe'
+import { useGateway } from '~/gateways/provider'
 import { setupTestGateway } from '../../../helpers'
 
 const photo = () => new File([new Uint8Array([1, 2, 3])], 'tee.png', { type: 'image/png' })
@@ -103,5 +104,34 @@ describe('AddDialog service', () => {
     expect(vm.step.value).toBe('pick')
     expect(vm.form.name).toBe('')
     expect(vm.form.category).toBe('bags')
+  })
+
+  it('pre-fills empty fields from the stylist without overwriting what you typed', async () => {
+    vi.spyOn(useGateway(), 'suggestDetails').mockResolvedValue({
+      name: 'Blush Silk Blouse',
+      category: 'tops',
+      colors: ['blush', 'cream'],
+      seasons: ['spring'],
+      occasions: ['work'],
+    })
+    const { vm } = setup('bags')
+    vm.form.name = 'My Blouse'
+    await toDetails(vm)
+    await flushPromises()
+    expect(vm.form.name).toBe('My Blouse')
+    expect(vm.form.category).toBe('bags')
+    expect(vm.form.colors).toBe('blush, cream')
+    expect(vm.form.seasons).toEqual(['spring'])
+    expect(vm.suggested.value).toBe(true)
+    expect(vm.suggesting.value).toBe(false)
+  })
+
+  it('keeps going quietly when no suggestion is possible', async () => {
+    vi.spyOn(useGateway(), 'suggestDetails').mockRejectedValue(new Error('CLI missing'))
+    const { vm } = setup()
+    await toDetails(vm)
+    await flushPromises()
+    expect(vm.suggested.value).toBe(false)
+    expect(vm.suggestionNote.value).toMatch(/fill in the details/i)
   })
 })

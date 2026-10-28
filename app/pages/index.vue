@@ -21,6 +21,17 @@ const vm = useHomePage()
         :date-label="vm.todayLabel"
         @toggle-favourite="vm.toggleFavourite"
       />
+      <div
+        v-else-if="vm.todayLoading.value"
+        class="grid h-[440px] place-items-center rounded-[2rem] bg-cream text-center"
+        aria-busy="true"
+        data-testid="today-loading"
+      >
+        <div>
+          <Icon name="lucide:sparkles" class="mx-auto size-6 animate-pulse text-rose" />
+          <p class="mt-3 font-display text-2xl text-ink">Your stylist is putting today's look together…</p>
+        </div>
+      </div>
       <UiEmptyState
         v-else
         icon="lucide:sparkles"

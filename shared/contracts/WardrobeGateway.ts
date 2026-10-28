@@ -1,3 +1,4 @@
+import type { DetailsSuggestion } from './GarmentTagger'
 import type { Item, ItemDetailsInput } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
 import type { StyleRequestInput } from '../models/styleRequest'
@@ -16,6 +17,8 @@ export type CreateItemInput = ItemDetailsInput & ProcessedPhoto
 export interface ItemGateway {
   listItems(): Promise<Item[]>
   createItem(input: CreateItemInput): Promise<Item>
+  /** AI pre-fill for the add-item form, from the clean image; may be empty. */
+  suggestDetails(cleanImage: string): Promise<DetailsSuggestion>
 }
 
 export interface PhotoGateway {
@@ -25,6 +28,8 @@ export interface PhotoGateway {
 
 export interface StyleMatchGateway {
   listStyleMatches(): Promise<StyleMatch[]>
+  /** Today's recommendation for a YYYY-MM-DD date (null with an empty wardrobe). */
+  getTodayLook(date: string): Promise<StyleMatch | null>
   setFavourite(id: string, isFavourite: boolean): Promise<StyleMatch>
 }
 

@@ -13,10 +13,13 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const generating = ref(false)
+  const todayId = ref<string | null>(null)
+  const todayLoading = ref(false)
   const generateError = ref<string | null>(null)
   let inFlight: Promise<void> | null = null
 
   const favourites = computed(() => favouriteLooks(looks.value))
+  const todayLook = computed(() => (todayId.value ? (looks.value.find((l) => l.id === todayId.value) ?? null) : null))
 
   function recent(limit: number) {
     return recentLooks(looks.value, limit)
@@ -61,6 +64,20 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     }
   }
 
+  /** Asks for today's recommendation (the backend styles one per day if needed). */
+  async function loadToday(date: string) {
+    todayLoading.value = true
+    try {
+      const look = await useGateway().getTodayLook(date)
+      if (look && !looks.value.some((l) => l.id === look.id)) looks.value = [...looks.value, look]
+      todayId.value = look?.id ?? null
+    } catch (e) {
+      error.value = message(e)
+    } finally {
+      todayLoading.value = false
+    }
+  }
+
   async function generate(request: StyleRequestInput): Promise<StyleMatch | null> {
     generating.value = true
     generateError.value = null
@@ -84,11 +101,14 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     error,
     generating,
     generateError,
+    todayLook,
+    todayLoading,
     recent,
     byId,
     pickFor,
     load,
     toggleFavourite,
+    loadToday,
     generate,
   }
 })

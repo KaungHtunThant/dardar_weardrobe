@@ -43,11 +43,15 @@ export const useWardrobeStore = defineStore('wardrobe', () => {
     return useGateway().removeBackground(photo)
   }
 
+  function suggestDetails(cleanImage: string) {
+    return useGateway().suggestDetails(cleanImage)
+  }
+
   async function addItem(input: CreateItemInput) {
     const item = await useGateway().createItem(input)
     raw.value = [...raw.value, item]
     return item
   }
 
-  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, addItem }
+  return { items, counts, loaded, loading, error, byCategory, load, prepareImage, suggestDetails, addItem }
 })

@@ -5,7 +5,7 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
 import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type Settings, type SettingsUpdate, type SettingsView } from '#shared/models/settings'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
-import { lookFromSuggestion } from '#shared/utils/looks'
+import { lookFromSuggestion, todaysPick } from '#shared/utils/looks'
 import type { SnapshotStore, WardrobeSnapshot } from './persistence/SnapshotStore'
 
 export interface MockGatewayOptions {
@@ -87,6 +87,18 @@ export class MockWardrobeGateway implements WardrobeGateway {
     await this.persist()
     await this.wait()
     return structuredClone(item)
+  }
+
+  /** Prototype: no vision, so nothing to suggest. */
+  async suggestDetails(_cleanImage: string) {
+    await this.wait()
+    return {}
+  }
+
+  /** Prototype: a stable pick from the saved looks (the real backend styles one per day). */
+  async getTodayLook(date: string) {
+    await this.wait()
+    return structuredClone(todaysPick((await this.data()).styleMatches, date))
   }
 
   async removeBackground(photo: Blob): Promise<ProcessedPhoto> {

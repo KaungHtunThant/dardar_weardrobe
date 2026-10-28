@@ -1,4 +1,4 @@
-> **Status (2026-10-28):** Phases 0–2 are done, including the Style Studio. Phase 3 (backend) is in progress, then Phase 4 (AI). The adjusted plans for both are in `phases/phase-3-backend.md` and `phases/phase-4-ai.md`. They supersede the Phase 3/4 sections below where they differ: SQLite through `node:sqlite` instead of better-sqlite3, a route table instead of per-file routes, an Offline advisor option, a Settings page, and AI pre-fill and daily picks.
+> **Status (2026-10-28):** Phases 0–4 are done: the UI, including the Style Studio, the local backend, and the AI. Packaging an installer is next. The adjusted plans for both are in `phases/phase-3-backend.md` and `phases/phase-4-ai.md`. They supersede the Phase 3/4 sections below where they differ: SQLite through `node:sqlite` instead of better-sqlite3, a route table instead of per-file routes, an Offline advisor option, a Settings page, and AI pre-fill and daily picks.
 > The per-phase write-ups are in [`phases/`](phases/), and the conventions are in [`architecture.md`](architecture.md).
 >
 > Changes from this plan made during implementation:

@@ -1,3 +1,4 @@
+import type { GarmentTagger } from '#shared/contracts/GarmentTagger'
 import type { SecretStore } from '#shared/contracts/SecretStore'
 import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
 import { ValidationError } from '#shared/errors'
@@ -14,11 +15,18 @@ export interface AdvisorFactory {
   api(settings: Settings, apiKey: string): StyleAdvisor
 }
 
+export interface TaggerFactory {
+  offline(): GarmentTagger
+  cli(settings: Settings): GarmentTagger
+  api(settings: Settings, apiKey: string): GarmentTagger
+}
+
 export interface SettingsServiceOptions {
   store: SettingsStore
   secrets: SecretStore
   runner: ProcessRunner
   advisors: AdvisorFactory
+  taggers?: TaggerFactory
   /** ANTHROPIC_API_KEY from the environment, which wins over a stored key. */
   envApiKey: () => string | null
   /** 'auto' picks CLI → API → Offline on first run; tests pin 'offline'. */
@@ -82,5 +90,19 @@ export class SettingsService {
     const key = await this.apiKey()
     if (!key) throw new ValidationError('Add your Anthropic API key in Settings, or switch the stylist to Claude CLI or Offline.')
     return this.o.advisors.api(settings, key.key)
+  }
+
+  /** The garment tagger for add-item pre-fill; without a usable AI it suggests nothing. */
+  async resolveTagger(): Promise<GarmentTagger> {
+    const none: GarmentTagger = { suggestDetails: async () => ({}) }
+    const t = this.o.taggers
+    if (!t) return none
+    const settings = await this.current()
+    if (settings.advisor === 'claude-cli') return t.cli(settings)
+    if (settings.advisor === 'claude-api') {
+      const key = await this.apiKey()
+      return key ? t.api(settings, key.key) : t.offline()
+    }
+    return t.offline()
   }
 }

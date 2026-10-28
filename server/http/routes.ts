@@ -21,18 +21,20 @@ const handle = (fn: (event: H3Event) => unknown) =>
  * tests mount the very same router on a standalone h3 app.
  */
 export function createApiRouter(c: Container) {
-  const items = new ItemController(c.items)
+  const items = new ItemController(c.items, c.tagging)
   const photos = new PhotoController(c.photos)
   const images = new ImageController(c.images)
-  const looks = new LookController(c.looks, c.styling)
+  const looks = new LookController(c.looks, c.styling, c.today)
   const settings = new SettingsController(c.settings)
 
   const router = createRouter({ preemptive: true })
     .get('/api/items', handle(() => items.list()))
     .post('/api/items', handle((e) => items.create(e)))
+    .post('/api/items/suggest', handle((e) => items.suggest(e)))
     .post('/api/photos', handle((e) => photos.upload(e)))
     .get('/api/images/:id', handle((e) => images.show(e)))
     .get('/api/looks', handle(() => looks.list()))
+    .get('/api/looks/today', handle((e) => looks.today(e)))
     .put('/api/looks/:id/favourite', handle((e) => looks.setFavourite(e)))
     .post('/api/looks/generate', handle((e) => looks.generate(e)))
     .get('/api/settings', handle(() => settings.show()))

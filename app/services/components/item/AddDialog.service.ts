@@ -57,8 +57,17 @@ export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryI
   const saving = ref(false)
   const dragging = ref(false)
   const form = reactive(emptyForm(props.defaultCategory))
+  const suggesting = ref(false)
+  const suggested = ref(false)
+  const suggestionNote = ref<string | null>(null)
+  /** Bumped on every new photo / reset so a late suggestion never fills the wrong form. */
+  let attempt = 0
 
   function reset() {
+    attempt++
+    suggesting.value = false
+    suggested.value = false
+    suggestionNote.value = null
     step.value = 'pick'
     originalImage.value = ''
     cleanImage.value = ''
@@ -93,12 +102,38 @@ export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryI
       originalImage.value = processed.originalImage
       cleanImage.value = processed.cleanImage
       step.value = 'details'
+      if (processed.backgroundRemoved === false) photoError.value = "We couldn't remove the background, so the original photo is used."
+      void prefill(processed.cleanImage)
     } catch (e) {
       photoError.value = e instanceof Error ? e.message : 'Could not process that photo.'
       originalImage.value = ''
       step.value = 'pick'
     } finally {
       if (localPreview) URL.revokeObjectURL(localPreview)
+    }
+  }
+
+  /** Asks the stylist about the photo and fills only the fields the user hasn't touched. */
+  async function prefill(image: string) {
+    const mine = ++attempt
+    suggesting.value = true
+    suggested.value = false
+    suggestionNote.value = null
+    try {
+      const s = await wardrobe.suggestDetails(image)
+      if (mine !== attempt) return
+      let filled = false
+      if (s.name && !form.name.trim()) [form.name, filled] = [s.name, true]
+      if (s.category && !form.category) [form.category, filled] = [s.category, true]
+      if (s.colors?.length && !form.colors.trim()) [form.colors, filled] = [s.colors.join(', '), true]
+      if (s.seasons?.length && form.seasons.length === 0) [form.seasons, filled] = [[...s.seasons], true]
+      if (s.occasions?.length && form.occasions.length === 0) [form.occasions, filled] = [[...s.occasions], true]
+      suggested.value = filled
+      suggestionNote.value = filled ? 'Suggested by your stylist. Check and adjust.' : null
+    } catch {
+      if (mine === attempt) suggestionNote.value = "Couldn't suggest details. Please fill in the details yourself."
+    } finally {
+      if (mine === attempt) suggesting.value = false
     }
   }
 
@@ -129,6 +164,9 @@ export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryI
   }
 
   function startOver() {
+    attempt++
+    suggesting.value = false
+    suggestionNote.value = null
     step.value = 'pick'
     originalImage.value = ''
     cleanImage.value = ''
@@ -178,6 +216,9 @@ export function useAddDialog(props: { open: boolean; defaultCategory?: CategoryI
     saving,
     dragging,
     form,
+    suggesting,
+    suggested,
+    suggestionNote,
     onFiles,
     onInputChange,
     onDrop,

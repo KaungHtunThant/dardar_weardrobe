@@ -5,7 +5,9 @@ import type { SecretStore } from '#shared/contracts/SecretStore'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
 import type { AdvisorMode } from '#shared/models/settings'
 import { ClaudeApiStyleAdvisor } from './ai/ClaudeApiStyleAdvisor'
+import { ClaudeApiTagger } from './ai/ClaudeApiTagger'
 import { ClaudeCliStyleAdvisor } from './ai/ClaudeCliStyleAdvisor'
+import { ClaudeCliTagger } from './ai/ClaudeCliTagger'
 import { runProcess, type ProcessRunner } from './ai/process'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
@@ -20,8 +22,10 @@ import { ItemService } from './services/ItemService'
 import { PhotoService } from './services/PhotoService'
 import { StyleMatchService } from './services/StyleMatchService'
 import { StylingService } from './services/StylingService'
+import { TaggingService } from './services/TaggingService'
+import { TodayService } from './services/TodayService'
 import { FileSecretStore } from './settings/FileSecretStore'
-import { SettingsService, type AdvisorFactory } from './settings/SettingsService'
+import { SettingsService, type AdvisorFactory, type TaggerFactory } from './settings/SettingsService'
 import { SettingsStore } from './settings/SettingsStore'
 
 export interface ContainerOptions {
@@ -39,20 +43,29 @@ export interface ContainerOptions {
   runner?: ProcessRunner
   secrets?: SecretStore
   advisors?: AdvisorFactory
+  taggers?: TaggerFactory
   defaultAdvisor?: 'auto' | AdvisorMode
   envApiKey?: () => string | null
 }
 
-/** Real advisors per mode; one SDK client per API key. */
-function advisorFactory(runner: ProcessRunner): AdvisorFactory {
+/** Real AI per mode; one SDK client per API key. */
+function aiFactories(runner: ProcessRunner): { advisors: AdvisorFactory; taggers: TaggerFactory } {
   const offline = new RuleBasedStyleAdvisor()
   const clients = new Map<string, Anthropic>()
+  const messages = (apiKey: string) => {
+    if (!clients.has(apiKey)) clients.set(apiKey, new Anthropic({ apiKey }))
+    return clients.get(apiKey)!.beta.messages
+  }
   return {
-    offline: () => offline,
-    cli: (s) => new ClaudeCliStyleAdvisor({ runner, model: s.model }),
-    api: (s, apiKey) => {
-      if (!clients.has(apiKey)) clients.set(apiKey, new Anthropic({ apiKey }))
-      return new ClaudeApiStyleAdvisor({ messages: clients.get(apiKey)!.beta.messages, model: s.model, effort: s.effort })
+    advisors: {
+      offline: () => offline,
+      cli: (s) => new ClaudeCliStyleAdvisor({ runner, model: s.model }),
+      api: (s, apiKey) => new ClaudeApiStyleAdvisor({ messages: messages(apiKey), model: s.model, effort: s.effort }),
+    },
+    taggers: {
+      offline: () => ({ suggestDetails: async () => ({}) }),
+      cli: (s) => new ClaudeCliTagger({ runner, model: s.model }),
+      api: (s, apiKey) => new ClaudeApiTagger({ messages: messages(apiKey), model: s.model }),
     },
   }
 }
@@ -67,11 +80,13 @@ export async function createContainer(options: ContainerOptions) {
   const dataDir = options.dataDir ?? (options.databasePath === ':memory:' ? options.imagesDir : dirname(options.databasePath))
   const runner = options.runner ?? runProcess
   const settingsStore = new SettingsStore(join(dataDir, 'settings.json'))
+  const ai = aiFactories(runner)
   const settings = new SettingsService({
     store: settingsStore,
     secrets: options.secrets ?? new FileSecretStore(join(dataDir, 'secrets.json')),
     runner,
-    advisors: options.advisors ?? advisorFactory(runner),
+    advisors: options.advisors ?? ai.advisors,
+    taggers: options.taggers ?? ai.taggers,
     envApiKey: options.envApiKey ?? (() => process.env.ANTHROPIC_API_KEY || null),
     defaultAdvisor: options.defaultAdvisor ?? 'auto',
   })
@@ -87,6 +102,8 @@ export async function createContainer(options: ContainerOptions) {
     looks: new StyleMatchService(lookRepo),
     styling: new StylingService(itemRepo, lookRepo, () => settings.resolveAdvisor(), clock),
     settings,
+    tagging: new TaggingService(images, () => settings.resolveTagger()),
+    today: new TodayService(itemRepo, lookRepo, () => settings.resolveAdvisor(), new RuleBasedStyleAdvisor(), clock),
     images,
     allowReset: options.allowReset ?? false,
     async reset() {

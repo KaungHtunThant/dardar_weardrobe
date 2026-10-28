@@ -24,15 +24,15 @@ export function useHomePage() {
 
   const loading = computed(() => !(wardrobe.loaded && looks.loaded) && !error.value)
   const error = computed(() => wardrobe.error ?? looks.error)
-  const today = computed(() => {
-    const pick = looks.pickFor(todayIso)
-    return pick ? withItems(pick) : null
-  })
+  const today = computed(() => (looks.todayLook ? withItems(looks.todayLook) : null))
+  const todayLoading = computed(() => looks.todayLoading)
   const recent = computed(() => looks.recent(RECENT_LIMIT).map(withItems))
   const favourites = computed(() => looks.favourites.map(withItems))
 
   async function init() {
     await Promise.all([wardrobe.load(), looks.load()])
+    // Styling today's look may take a while with Claude; the rest of Home shows meanwhile.
+    await looks.loadToday(todayIso)
   }
 
   function toggleFavourite(id: string) {
@@ -41,5 +41,5 @@ export function useHomePage() {
 
   onViewMounted(init)
 
-  return { loading, error, today, recent, favourites, todayLabel: longDayLabel(now), init, toggleFavourite }
+  return { loading, error, today, todayLoading, recent, favourites, todayLabel: longDayLabel(now), init, toggleFavourite }
 }

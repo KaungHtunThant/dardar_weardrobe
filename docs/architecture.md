@@ -34,7 +34,12 @@ tests/                  unit/, nuxt/, contracts/, e2e/
 - Views never touch stores, and stores never know which gateway they are using.
 - `app/gateways/provider.ts` is the only link between stores and the gateway: `provideGateway()` / `useGateway()`.
 - `app/gateways/createGateway.ts` is the only file that creates a concrete gateway. It picks one from `runtimeConfig.public.gateway`.
-- AI styling sits behind `StyleAdvisor`. The mock gateway uses `MockStyleAdvisor` today, injected through its `advisor` option. In Phase 4 the server gets `ClaudeCliProvider` and `ClaudeApiProvider`; both pass the same advisor contract suite.
+- **AI sits behind contracts.**
+  - `StyleAdvisor` has three implementations: `RuleBasedStyleAdvisor` (offline), `ClaudeCliStyleAdvisor` and `ClaudeApiStyleAdvisor`.
+  - `GarmentTagger` has the CLI and API taggers.
+  - `ImageProcessor` is the imgly background remover.
+  - `SettingsService` resolves the advisor and tagger per request from the user's choice. Concrete classes are wired in `server/container.ts`.
+  - All advisors pass `tests/contracts/styleAdvisor.contract.ts`. Model output always goes through `toSuggestion()` / `toDetailsSuggestion()`, so a model can never break the Studio rules or the data.
 
 ## Views are markup only
 

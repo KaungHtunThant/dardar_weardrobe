@@ -55,9 +55,22 @@ const vm = useAddDialog(props, emit)
         <button type="button" class="mt-3 self-start text-sm text-taupe underline-offset-4 hover:text-ink hover:underline" @click="vm.startOver">
           Use a different photo
         </button>
+        <p v-if="vm.photoError.value" class="mt-2 text-xs text-rose">{{ vm.photoError.value }}</p>
       </div>
 
       <div class="flex flex-col gap-4">
+        <p v-if="vm.suggesting.value" class="flex items-center gap-2 text-xs text-taupe" aria-live="polite" data-testid="suggesting">
+          <Icon name="lucide:sparkles" class="size-3.5 animate-pulse text-rose" /> Your stylist is looking at this piece…
+        </p>
+        <p
+          v-else-if="vm.suggestionNote.value"
+          class="flex items-center gap-2 text-xs"
+          :class="vm.suggested.value ? 'text-rose' : 'text-taupe'"
+          aria-live="polite"
+          data-testid="suggestion-note"
+        >
+          <Icon :name="vm.suggested.value ? 'lucide:sparkles' : 'lucide:info'" class="size-3.5" /> {{ vm.suggestionNote.value }}
+        </p>
         <div>
           <label for="item-name" class="mb-1.5 block text-xs uppercase tracking-[0.2em] text-taupe">Name</label>
           <input

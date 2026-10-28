@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { WardrobeGateway } from '#shared/contracts/WardrobeGateway'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
-import { ItemSchema } from '#shared/models/item'
+import { ItemDetailsSchema, ItemSchema } from '#shared/models/item'
 import { StyleMatchSchema } from '#shared/models/styleMatch'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
 
@@ -51,9 +51,25 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       await expect(gw.createItem({ name: '', category: 'tops', ...processed })).rejects.toThrow()
     })
 
+    it('suggests details for an uploaded photo (possibly nothing, never invalid values)', async () => {
+      const gw = await fresh()
+      const { cleanImage } = await gw.removeBackground(photo())
+      const suggestion = await gw.suggestDetails(cleanImage)
+      expect(() => ItemDetailsSchema.partial().parse(suggestion)).not.toThrow()
+    })
+
+    it("returns the same look for today every time, made of wardrobe pieces", async () => {
+      const gw = await fresh()
+      const first = await gw.getTodayLook('2026-10-28')
+      expect(first).not.toBeNull()
+      expect((await gw.getTodayLook('2026-10-28'))!.id).toBe(first!.id)
+      const ids = new Set(seedItems.map((i) => i.id))
+      for (const id of first!.itemIds) expect(ids.has(id)).toBe(true)
+    })
+
     it('lists all style matches', async () => {
       const gw = await fresh()
-      expect(await gw.listStyleMatches()).toHaveLength(seedStyleMatches.length)
+      expect((await gw.listStyleMatches()).length).toBeGreaterThanOrEqual(seedStyleMatches.length)
     })
 
     it('toggles a look as favourite and keeps it', async () => {

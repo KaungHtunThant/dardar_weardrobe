@@ -58,4 +58,24 @@ describe('style matches store', () => {
     expect(store.generateError).toBe('advisor down')
     expect(store.generating).toBe(false)
   })
+
+  it("loads today's look from the gateway and tracks progress", async () => {
+    const store = useStyleMatchesStore()
+    await store.load()
+    const pending = store.loadToday('2026-10-28')
+    expect(store.todayLoading).toBe(true)
+    await pending
+    expect(store.todayLoading).toBe(false)
+    expect(store.todayLook?.id).toBe(store.pickFor('2026-10-28')!.id)
+  })
+
+  it("adds a newly styled daily look to the list", async () => {
+    const look = { ...(await gateway.listStyleMatches())[0]!, id: 'look-today', dailyPickDate: '2026-10-28' }
+    vi.spyOn(gateway, 'getTodayLook').mockResolvedValueOnce(look)
+    const store = useStyleMatchesStore()
+    await store.load()
+    await store.loadToday('2026-10-28')
+    expect(store.byId('look-today')).not.toBeNull()
+    expect(store.todayLook?.id).toBe('look-today')
+  })
 })

@@ -3,6 +3,7 @@ import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/c
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
+import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { SettingsUpdate, SettingsView } from '#shared/models/settings'
 
 /** Talks to the local Nitro API (same origin in the app; an explicit base URL in tests). */
@@ -29,6 +30,14 @@ export class HttpWardrobeGateway implements WardrobeGateway {
 
   createItem(input: CreateItemInput) {
     return this.call(() => this.api<Item>('/api/items', { method: 'POST', body: input }))
+  }
+
+  suggestDetails(cleanImage: string) {
+    return this.call(() => this.api<DetailsSuggestion>('/api/items/suggest', { method: 'POST', body: { image: cleanImage } }))
+  }
+
+  async getTodayLook(date: string) {
+    return (await this.call(() => this.api<{ look: StyleMatch | null }>('/api/looks/today', { query: { date } }))).look
   }
 
   removeBackground(photo: Blob) {
