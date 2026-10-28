@@ -6,7 +6,7 @@
 - `a9fe6aa`: part 2, Wardrobe closet and list views
 - `745e576`: part 3, add-item flow
 - `079603e`: part 4a, style requests, ratings and the mock advisor
-- part 4b (this commit): the Style Studio page
+- `09b754b`: part 4b, the Style Studio page
 
 ## Goal
 Build the whole UI as a working prototype with no backend, so the experience can be reviewed early. Data comes from a mock gateway that saves to IndexedDB.
