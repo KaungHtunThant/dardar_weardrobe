@@ -75,9 +75,10 @@ const vm = useSettingsPage()
           id="api-key"
           v-model="vm.apiKeyInput.value"
           type="password"
+          :disabled="vm.keyInputDisabled.value"
           autocomplete="off"
           placeholder="sk-ant-…"
-          class="h-11 flex-1 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-taupe/60 focus:border-blush focus:outline-none"
+          class="h-11 flex-1 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-taupe/60 focus:border-blush focus:outline-none disabled:opacity-50"
         >
         <button
           v-if="vm.view.value?.apiKey.source === 'stored'"

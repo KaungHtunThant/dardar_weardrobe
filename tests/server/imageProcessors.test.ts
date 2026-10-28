@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { ImglyImageProcessor } from '../../server/infrastructure/ImglyImageProcessor'
+import { ImglyImageProcessor, imglyPublicPath } from '../../server/infrastructure/ImglyImageProcessor'
 
 describe('ImglyImageProcessor', () => {
   it('leaves SVGs alone (vector art has no photo background) without loading the model', async () => {
@@ -19,5 +21,29 @@ describe('ImglyImageProcessor', () => {
     }))
     const out = await processor.removeBackground(new Uint8Array([9, 9, 9]), 'image/jpeg')
     expect(out).toEqual({ bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/png' })
+  })
+
+  it('tells the model where its files are, independent of the working directory', async () => {
+    let config: { publicPath?: string } | undefined
+    const processor = new ImglyImageProcessor(async () => ({
+      removeBackground: async (_blob: Blob, c?: object) => {
+        config = c as { publicPath?: string }
+        return new Blob([new Uint8Array([1])], { type: 'image/png' })
+      },
+    }))
+    const cwd = process.cwd()
+    process.chdir('/')
+    try {
+      await processor.removeBackground(new Uint8Array([9]), 'image/jpeg')
+    } finally {
+      process.chdir(cwd)
+    }
+    expect(config!.publicPath).toBe(imglyPublicPath())
+  })
+
+  it("finds the imgly package's model files", () => {
+    const dir = imglyPublicPath()
+    expect(dir).toMatch(/^file:\/\/.*\/@imgly\/background-removal-node\/dist\/$/)
+    expect(existsSync(fileURLToPath(new URL('resources.json', dir)))).toBe(true)
   })
 })

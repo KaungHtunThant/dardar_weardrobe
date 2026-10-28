@@ -71,7 +71,7 @@ export class SettingsService {
       ...settings,
       apiKey: { present: Boolean(key), source: key?.source ?? null, last4: key ? key.key.slice(-4) : null },
       cli: { available: Boolean(version), version },
-      secureStorage: this.o.secrets.secure,
+      keyStorage: await this.o.secrets.storage(),
     }
   }
 

@@ -27,7 +27,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | 2: UI prototype | Done, awaiting review | `1e0c0a4`, `a9fe6aa`, `745e576`, `079603e`, `09b754b`, `5cd5013` |
 | 3: Backend | Done | `8c238ef` |
 | 4: AI | Done | `4072a35`, `e8f0760`, `879c622` |
-| 5: Manage, library, streaming, installer | In progress (Steps 1–3 done) | `60d0b16`, `5de3875` |
+| 5: Manage, library, streaming, installer | Done | `60d0b16`, `5de3875`, `31a6317`, Step 4 |
 
 ## Running the app
 
@@ -39,8 +39,22 @@ npm run dev:mock     # backend-free prototype (mock gateway, IndexedDB)
 npm test             # Vitest: unit + nuxt projects
 npm run test:e2e     # Playwright driving the real Electron app
 npm run lint
-npm run typecheck
+npm run typecheck    # Nuxt app + the Electron main process
 ```
+
+## Installers
+
+```bash
+npm run dist:linux   # release/Dardar-Wardrobe-<version>-x86_64.AppImage
+npm run dist:win     # release/Dardar-Wardrobe-<version>-x64.exe (NSIS) — run on Windows
+npm run test:smoke   # Playwright against the unpacked build, with a brand-new profile
+```
+
+- Each platform builds its own installer, because the server's native modules (ONNX runtime, sharp) must match it. The **Release builds** GitHub Actions workflow (Actions tab → Run workflow) builds and smoke-tests the Windows `.exe` and the Linux AppImage and attaches them to the run.
+- `npm run build` makes `.output` self-contained: `scripts/bundle-server-assets.mjs` adds the background-removal model and keeps only this platform's CPU ONNX runtime (516 MB → 129 MB).
+- electron-builder (`electron-builder.yml`) ships `.output` as `resources/app-server`, outside the asar archive.
+- The icon is drawn by `npm run icon` (`build/icon.png`).
+- **Known limits:** the builds are unsigned, so Windows SmartScreen and macOS Gatekeeper will warn. There is no macOS build yet. The first background removal after a start loads the model, which takes a few seconds. Linux needs a system keychain (GNOME Keyring or KWallet) to save an API key; without one, set `ANTHROPIC_API_KEY` instead.
 
 Data: the dev server keeps its SQLite database and images in `.data/` and seeds demo clothes into an empty database (`NUXT_DEMO_SEED=false` to start empty). The packaged app stores data in Electron's `userData` folder and starts empty.
 

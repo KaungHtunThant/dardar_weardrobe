@@ -4,7 +4,9 @@ import type { SecretStore } from '#shared/contracts/SecretStore'
 
 /** Dev fallback: a file only the current user can read (0600). The packaged app uses the OS keychain. */
 export class FileSecretStore implements SecretStore {
-  readonly secure = false
+  async storage() {
+    return 'private-file' as const
+  }
 
   constructor(private readonly path: string) {}
 

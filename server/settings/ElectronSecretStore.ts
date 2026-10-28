@@ -1,4 +1,5 @@
-import type { SecretStore } from '#shared/contracts/SecretStore'
+import type { KeyStorage, SecretStore } from '#shared/contracts/SecretStore'
+import { ValidationError } from '#shared/errors'
 
 /** Electron's utility-process port (`process.parentPort`). */
 export interface ParentPort {
@@ -15,10 +16,10 @@ interface SecretResult {
 
 /**
  * Packaged app: the Nitro server runs in an Electron utility process and asks the main process,
- * which encrypts the key with `safeStorage` (OS keychain). The key never touches disk in plain text.
+ * which encrypts the key with `safeStorage` (OS keychain). The key never touches disk in plain text;
+ * without a keychain it isn't stored at all.
  */
 export class ElectronSecretStore implements SecretStore {
-  readonly secure = true
   private nextId = 1
   private readonly pending = new Map<number, (r: SecretResult) => void>()
 
@@ -29,7 +30,7 @@ export class ElectronSecretStore implements SecretStore {
     })
   }
 
-  private request(type: 'secret:get' | 'secret:set', value?: string | null): Promise<string | null> {
+  private request(type: 'secret:status' | 'secret:get' | 'secret:set', value?: string | null): Promise<string | null> {
     const id = this.nextId++
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -39,11 +40,21 @@ export class ElectronSecretStore implements SecretStore {
       this.pending.set(id, (r) => {
         clearTimeout(timer)
         this.pending.delete(id)
-        if (r.error) reject(new Error(r.error))
+        if (r.error === 'unavailable')
+          reject(
+            new ValidationError(
+              "This computer has no system keychain (such as GNOME Keyring or KWallet), so the key can't be stored safely. Set the ANTHROPIC_API_KEY environment variable before starting the app instead.",
+            ),
+          )
+        else if (r.error) reject(new Error(r.error))
         else resolve(r.value)
       })
       this.port.postMessage({ type, id, value })
     })
+  }
+
+  async storage(): Promise<KeyStorage> {
+    return (await this.request('secret:status')) === 'keychain' ? 'keychain' : 'unavailable'
   }
 
   getApiKey() {

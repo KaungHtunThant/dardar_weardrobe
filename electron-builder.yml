@@ -1,0 +1,43 @@
+# Installers: `npm run dist:linux` (AppImage) and `npm run dist:win` (NSIS .exe, build on Windows — see .github/workflows/release.yml).
+appId: com.dardar.wardrobe
+productName: Dardar Wardrobe
+copyright: Copyright © 2026 Dardar
+directories:
+  output: release
+  buildResources: build
+
+# The Electron shell is tiny; everything the app runs lives in the Nitro output below.
+files:
+  - dist-electron/**
+  - package.json
+  - "!node_modules/**"
+# The built server ships outside the asar archive: its native modules (ONNX runtime, sharp) and the
+# background-removal model can't be loaded from inside one. electron/paths.ts must match `to`.
+extraResources:
+  - from: .output
+    to: app-server
+    filter: ["**/*"]
+# Nitro already bundled and traced the server's dependencies.
+npmRebuild: false
+nodeGypRebuild: false
+asar: true
+
+linux:
+  target: AppImage
+  category: Graphics
+  icon: build/icon.png
+  executableName: dardar-wardrobe
+  syncDesktopName: true
+  synopsis: Your wardrobe, styled by AI
+
+win:
+  target: nsis
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Dardar Wardrobe
+
+artifactName: Dardar-Wardrobe-${version}-${arch}.${ext}

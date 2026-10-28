@@ -1,7 +1,9 @@
-import { app, BrowserWindow, safeStorage, shell, utilityProcess, type UtilityProcess } from 'electron'
+import { app, BrowserWindow, safeStorage, shell, utilityProcess } from 'electron'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { serverEntry } from './paths'
+import { createSecretHandler, type SecretRequest } from './secrets'
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production'
 const DEV_URL = process.env.DARDAR_URL ?? 'http://localhost:3000'
@@ -18,41 +20,30 @@ function freePort(): Promise<number> {
   })
 }
 
-interface SecretRequest {
-  type: 'secret:get' | 'secret:set'
-  id: number
-  value?: string | null
-}
-
 const secretFile = () => join(app.getPath('userData'), 'anthropic-key.bin')
 
-/** The server asks for the API key over the utility-process port; it is encrypted with the OS keychain. */
-function answerSecretRequest(child: UtilityProcess, msg: SecretRequest) {
-  if (msg?.type !== 'secret:get' && msg?.type !== 'secret:set') return
-  try {
-    let value: string | null = null
-    if (msg.type === 'secret:set') {
-      if (msg.value) writeFileSync(secretFile(), safeStorage.encryptString(msg.value), { mode: 0o600 })
-      else rmSync(secretFile(), { force: true })
-      value = msg.value ?? null
-    } else {
-      try {
-        value = safeStorage.decryptString(readFileSync(secretFile()))
-      } catch {
-        value = null
-      }
+/** The API key is encrypted by the OS keychain (safeStorage) and only stored that way. */
+const handleSecret = createSecretHandler({
+  available: () => safeStorage.isAsyncEncryptionAvailable(),
+  encrypt: (text) => safeStorage.encryptStringAsync(text),
+  decrypt: async (data) => (await safeStorage.decryptStringAsync(data)).result,
+  read: () => {
+    try {
+      return readFileSync(secretFile())
+    } catch {
+      return null
     }
-    child.postMessage({ type: 'secret:result', id: msg.id, value })
-  } catch (e) {
-    child.postMessage({ type: 'secret:result', id: msg.id, value: null, error: (e as Error).message })
-  }
-}
+  },
+  write: (data) => writeFileSync(secretFile(), data, { mode: 0o600 }),
+  remove: () => rmSync(secretFile(), { force: true }),
+})
 
 /** In production the built Nitro server runs in a utility process bound to localhost. */
 async function startNitro(): Promise<string> {
   const port = await freePort()
-  const entry = join(app.getAppPath(), '.output', 'server', 'index.mjs')
+  const entry = serverEntry({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath })
   const child = utilityProcess.fork(entry, [], {
+    cwd: dirname(entry),
     env: {
       ...process.env,
       HOST: '127.0.0.1',
@@ -63,7 +54,7 @@ async function startNitro(): Promise<string> {
     },
     stdio: 'inherit',
   })
-  child.on('message', (msg: SecretRequest) => answerSecretRequest(child, msg))
+  child.on('message', (msg: SecretRequest) => void handleSecret(msg).then((reply) => reply && child.postMessage(reply)))
   app.on('before-quit', () => child.kill())
   const url = `http://127.0.0.1:${port}`
   for (let i = 0; i < 100; i++) {

@@ -1,0 +1,43 @@
+# Builds the installers. Run it from the Actions tab ("Run workflow"); the installers are attached to the run.
+# Each OS builds its own: the server's native modules (ONNX runtime, sharp) must match the platform.
+name: Release builds
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            dist: dist:win
+            artifact: release/*.exe
+          - os: ubuntu-latest
+            dist: dist:linux
+            artifact: release/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run ${{ matrix.dist }}
+        env:
+          # Unsigned builds; don't look for a code-signing certificate.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Smoke test the packaged app
+        if: runner.os == 'Windows'
+        run: npm run test:smoke
+      - name: Smoke test the packaged app
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dardar-wardrobe-${{ runner.os }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error

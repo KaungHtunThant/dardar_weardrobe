@@ -92,11 +92,14 @@ export function useSettingsPage() {
       (view.value !== null && (form.advisor !== view.value.advisor || form.model !== view.value.model || form.effort !== view.value.effort)),
   )
 
-  const keyStorageNote = computed(() =>
-    view.value?.secureStorage
-      ? 'Encrypted with your system keychain. It never leaves this computer except to call Anthropic.'
-      : 'Stored in a private file in the app data folder (development mode). It never leaves this computer except to call Anthropic.',
-  )
+  const KEY_STORAGE_NOTES = {
+    keychain: 'Encrypted with your system keychain. It never leaves this computer except to call Anthropic.',
+    'private-file': 'Stored in a private file in the app data folder (development mode). It never leaves this computer except to call Anthropic.',
+    unavailable:
+      "This computer has no system keychain (such as GNOME Keyring or KWallet), so the key can't be stored safely here. Set the ANTHROPIC_API_KEY environment variable before starting the app instead.",
+  } as const
+  const keyStorageNote = computed(() => KEY_STORAGE_NOTES[view.value?.keyStorage ?? 'private-file'])
+  const keyInputDisabled = computed(() => view.value?.keyStorage === 'unavailable')
 
   function flash(text: string) {
     savedMessage.value = text
@@ -168,6 +171,7 @@ export function useSettingsPage() {
     efforts: EFFORTS,
     keyStatus,
     keyStorageNote,
+    keyInputDisabled,
     warning,
     dirty,
     saving: computed(() => store.saving),

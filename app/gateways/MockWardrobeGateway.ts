@@ -191,7 +191,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
       ...this.settings,
       apiKey: { present: Boolean(this.apiKey), source: this.apiKey ? 'stored' : null, last4: this.apiKey?.slice(-4) ?? null },
       cli: { available: false, version: null },
-      secureStorage: false,
+      keyStorage: 'private-file',
     }
   }
 

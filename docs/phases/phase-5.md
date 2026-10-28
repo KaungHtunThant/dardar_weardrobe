@@ -1,6 +1,6 @@
 # Phase 5: Manage pieces, Looks library, faster-feeling AI, installer
 
-**Status:** In progress (Steps 1–3 done)
+**Status:** Done (Windows CI build pending its first run)
 
 The user chose all four next steps after Phase 4. The plan below is the approved one.
 
@@ -69,6 +69,34 @@ The Studio now shows the look taking shape instead of a 20–30 s spinner, and t
 
 Cancel during a live run saved nothing, showed no error, and left no `claude` process running.
 
-## Step 4: Installer (planned)
-- electron-builder: AppImage built locally, and a Windows NSIS build on GitHub Actions. The Nitro output is shipped as `extraResources` outside the asar archive.
-- An app icon, smoke-tested from a clean profile.
+## Step 4: Installer (done)
+- **electron-builder** (`electron-builder.yml`):
+  - The Electron shell (`dist-electron` plus `package.json`) goes in the asar; no `node_modules`.
+  - The Nitro output ships as an extra resource, `resources/app-server`. Native modules and model files can't load from inside an asar. `electron/paths.ts` (`serverEntry`) picks the packaged or project path.
+  - Targets: **AppImage** (Linux) and **NSIS** (Windows, with a choice of folder and a desktop shortcut).
+  - Scripts: `npm run dist:linux`, `npm run dist:win`, `npm run test:smoke`.
+- **A self-contained, lean server bundle** (`scripts/bundle-server-assets.mjs`, run by `npm run build`):
+  - **Bug fixed:** imgly resolved its model folder against the *working directory*. It only worked from the project folder; an installed app would have silently kept every photo's background. `ImglyImageProcessor` now passes `publicPath` from Node's module search paths (`imglyPublicPath()`), and the build copies the `medium` model (22 chunks, 88 MB) into `.output`.
+  - Only this platform's CPU ONNX runtime is kept. The 480 MB CUDA provider, TensorRT and the other OSes are dropped.
+  - Sizes: `.output` 516 MB → 129 MB; the AppImage is **214 MB**; unpacked 402 MB (about 270 MB of that is Electron).
+- **API key in the installed app:**
+  - The main process's key handling moved to `electron/secrets.ts` (`createSecretHandler`, unit-tested) and uses the async `safeStorage` API. The sync calls are deprecated in Electron 45.
+  - **Bug fixed:** with no OS keychain (here: WSL; on Linux, no GNOME Keyring or KWallet), saving a key failed with a bare 500. Now `SecretStore.storage()` reports `keychain`, `private-file` (dev) or `unavailable`. Without a keychain the key is never written; Settings disables the field and explains how to use `ANTHROPIC_API_KEY` instead.
+  - The settings view's `secureStorage: boolean` became `keyStorage`.
+- **Icon:** `scripts/generate-icon.mjs` draws a rose Didone-style "D" with a gold hairline on ivory as pure SVG paths (no font dependency), saved as `build/icon.png`. electron-builder derives the `.ico` and Linux sizes from it.
+- **CI:** `.github/workflows/release.yml` (manual run). On `windows-latest` and `ubuntu-latest` it runs `npm ci`, then the unit tests, the installer build and the packaged smoke test (Linux under xvfb), and uploads the installer.
+- **Typecheck:** `npm run typecheck` also checks `electron/` (`tsconfig.electron.json`).
+
+### Smoke test (`tests/smoke/packaged.spec.ts`, `release/linux-unpacked`, brand-new profile)
+1. Starts empty: no demo data, "No recommendation yet".
+2. Adds a real photo, and the **bundled model removes the background** (no fallback message).
+3. Styles it with the Offline stylist and shows a score.
+4. API key: with a keychain, it is saved, encrypted (the file holds no `sk-ant`), and still there after a restart. Without one, the field is disabled and explained, and no key file is written. This machine took the second path.
+5. Restarts: the piece is still in the wardrobe.
+
+The AppImage file itself was also launched with a clean profile (`APPIMAGE_EXTRACT_AND_RUN=1`) and opened on an empty Home.
+
+### Known limits
+- The builds are unsigned (SmartScreen will warn), and there is no macOS build.
+- The first background removal after a start loads the model, which takes a few seconds.
+- Saving an API key on Linux needs a system keychain.

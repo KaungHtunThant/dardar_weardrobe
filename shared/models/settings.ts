@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { KeyStorage } from '../contracts/SecretStore'
 
 export const ADVISOR_MODES = ['claude-cli', 'claude-api', 'offline'] as const
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
@@ -28,5 +29,6 @@ export interface SettingsView extends Settings {
   apiKey: { present: boolean; source: 'env' | 'stored' | null; last4: string | null }
   cli: { available: boolean; version: string | null }
   /** True when the key is encrypted by the OS keychain (packaged app). */
-  secureStorage: boolean
+  /** Where a saved key goes: the OS keychain, a private file (development), or nowhere (no keychain). */
+  keyStorage: KeyStorage
 }

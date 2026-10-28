@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsPage } from '~/services/pages/settings.service'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
@@ -11,8 +11,9 @@ async function ready() {
 }
 
 describe('settings page service', () => {
+  let gateway: ReturnType<typeof setupTestGateway>
   beforeEach(() => {
-    setupTestGateway()
+    gateway = setupTestGateway()
   })
 
   it('shows the three stylist modes with their status', async () => {
@@ -58,6 +59,16 @@ describe('settings page service', () => {
   it('explains where the key is kept', async () => {
     const vm = await ready()
     expect(vm.keyStorageNote.value).toMatch(/private file/)
+    expect(vm.keyInputDisabled.value).toBe(false)
+  })
+
+  it('without a system keychain, the key field is off and the note says what to do instead', async () => {
+    const real = gateway.getSettings.bind(gateway)
+    vi.spyOn(gateway, 'getSettings').mockImplementation(async () => ({ ...(await real()), keyStorage: 'unavailable' }))
+    const vm = await ready()
+    expect(vm.keyInputDisabled.value).toBe(true)
+    expect(vm.keyStorageNote.value).toMatch(/no system keychain/i)
+    expect(vm.keyStorageNote.value).toMatch(/ANTHROPIC_API_KEY/)
   })
 
   it('clears the wardrobe only after confirmation, keeping the settings', async () => {

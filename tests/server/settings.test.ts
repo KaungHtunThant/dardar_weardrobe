@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
 import { ValidationError } from '#shared/errors'
 import { ElectronSecretStore, type ParentPort } from '../../server/settings/ElectronSecretStore'
+import { createSecretHandler } from '../../electron/secrets'
 import { FileSecretStore } from '../../server/settings/FileSecretStore'
 import { SettingsService, type AdvisorFactory } from '../../server/settings/SettingsService'
 import { SettingsStore } from '../../server/settings/SettingsStore'
@@ -61,7 +62,9 @@ describe('SettingsService', () => {
     const view = await service().update({ apiKey: 'sk-ant-secret-1234' })
     expect(view.apiKey).toEqual({ present: true, source: 'stored', last4: '1234' })
     expect(JSON.stringify(view)).not.toContain('secret')
-    expect(statSync(join(dir, 'secrets.json')).mode & 0o777).toBe(0o600)
+    // POSIX permissions; Windows keeps the file private through the user's profile ACL instead.
+    if (process.platform !== 'win32') expect(statSync(join(dir, 'secrets.json')).mode & 0o777).toBe(0o600)
+    expect(view.keyStorage).toBe('private-file')
     expect(readFileSync(join(dir, 'settings.json'), 'utf8')).not.toContain('sk-ant')
     expect((await service().update({ apiKey: null })).apiKey.present).toBe(false)
   })
@@ -88,19 +91,51 @@ describe('SettingsService', () => {
 })
 
 describe('ElectronSecretStore', () => {
-  it('asks the Electron main process (safeStorage) over the parent port', async () => {
+  /** A parent port wired to the real main-process handler with a fake keychain. */
+  function portTo(available: boolean) {
     const listeners: ((e: { data: unknown }) => void)[] = []
-    let stored: string | null = null
+    let file: Buffer | null = null
+    const handle = createSecretHandler({
+      available: async () => available,
+      encrypt: async (s) => Buffer.from(s, 'utf8').reverse(),
+      decrypt: async (b) => Buffer.from(b).reverse().toString('utf8'),
+      read: () => file,
+      write: (b) => void (file = b),
+      remove: () => void (file = null),
+    })
     const port: ParentPort = {
       on: (_event, fn) => listeners.push(fn),
-      postMessage(msg: { id: number; type: string; value?: string | null }) {
-        if (msg.type === 'secret:set') stored = msg.value ?? null
-        queueMicrotask(() => listeners.forEach((l) => l({ data: { type: 'secret:result', id: msg.id, value: stored } })))
+      postMessage(msg) {
+        void handle(msg).then((reply) => reply && listeners.forEach((l) => l({ data: reply })))
       },
     }
-    const store = new ElectronSecretStore(port)
-    expect(store.secure).toBe(true)
+    return port
+  }
+
+  it('asks the Electron main process (safeStorage) over the parent port', async () => {
+    const store = new ElectronSecretStore(portTo(true))
+    expect(await store.storage()).toBe('keychain')
     await store.setApiKey('sk-x')
     expect(await store.getApiKey()).toBe('sk-x')
+  })
+
+  it('refuses to store a key when the computer has no keychain, and says what to do instead', async () => {
+    const store = new ElectronSecretStore(portTo(false))
+    expect(await store.storage()).toBe('unavailable')
+    await expect(store.setApiKey('sk-x')).rejects.toThrow(ValidationError)
+    await expect(store.setApiKey('sk-x')).rejects.toThrow(/keychain.*ANTHROPIC_API_KEY/s)
+    expect(await store.getApiKey()).toBeNull()
+  })
+
+  it('shows the settings page where the key is kept', async () => {
+    const view = await new SettingsService({
+      store: new SettingsStore(join(dir, 'settings.json')),
+      secrets: new ElectronSecretStore(portTo(false)),
+      runner: cliMissing,
+      advisors: factory,
+      envApiKey: () => null,
+      defaultAdvisor: 'auto',
+    }).get()
+    expect(view.keyStorage).toBe('unavailable')
   })
 })
