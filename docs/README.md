@@ -24,7 +24,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | 0: Scaffolding | Done | `a14d9ac`, `54c328f` |
 | 1: Domain model | Done | `9e99bf5` |
 | 2: UI prototype | Done, awaiting review | `1e0c0a4`, `a9fe6aa`, `745e576`, `079603e`, `09b754b`, `5cd5013` |
-| 3: Backend | In progress | |
+| 3: Backend | Done | see git log (Phase 3) |
 | 4: AI | Planned | |
 
 ## Running the app
@@ -33,11 +33,14 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 npm install          # also runs `nuxt prepare`
 npm run dev          # Nuxt dev server + Electron window
 npm run dev:web      # Nuxt only, in a browser at http://localhost:3000
+npm run dev:mock     # backend-free prototype (mock gateway, IndexedDB)
 npm test             # Vitest: unit + nuxt projects
 npm run test:e2e     # Playwright driving the real Electron app
 npm run lint
 npm run typecheck
 ```
+
+Data: the dev server keeps its SQLite database and images in `.data/` and seeds demo clothes into an empty database (`NUXT_DEMO_SEED=false` to start empty). The packaged app stores data in Electron's `userData` folder and starts empty.
 
 Requirements:
 - Node 22 or later.

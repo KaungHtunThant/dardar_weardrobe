@@ -16,7 +16,9 @@ app/                    VIEW + client-side CONTROLLERS
   gateways/             WardrobeGateway implementations + composition root (createGateway.ts)
   plugins/gateway.ts    injects the configured gateway at startup
 
-server/  (Phase 3)      CONTROLLERS → services → repositories + infrastructure, wired in server/container.ts
+server/                 CONTROLLERS → services → repositories + infrastructure, wired in server/container.ts
+  http/routes.ts        the whole API as one route table (Nitro: api/[...].ts; tests: in-process h3)
+  database/             node:sqlite + Drizzle (sqlite-proxy), versioned migrations
 electron/               desktop shell: main.ts (window, Nitro in production), preload.ts (minimal bridge)
 tests/                  unit/, nuxt/, contracts/, e2e/
 ```
@@ -25,8 +27,8 @@ tests/                  unit/, nuxt/, contracts/, e2e/
 
 ```
 .vue view ──binds──▶ service (useXxx) ──calls──▶ Pinia store ──calls──▶ WardrobeGateway (interface)
-                                                                          ├─ MockWardrobeGateway (now)
-                                                                          └─ HttpWardrobeGateway (Phase 3)
+                                                                          ├─ HttpWardrobeGateway (default) ─▶ /api ─▶ controllers ─▶ services ─▶ SQLite / image files
+                                                                          └─ MockWardrobeGateway (dev:mock, tests)
 ```
 
 - Views never touch stores, and stores never know which gateway they are using.
@@ -105,4 +107,6 @@ TDD order for each feature:
 - **Don't mock `useRouter`;** it breaks Nuxt's router hooks. Use the real router and `vi.spyOn` its methods.
 - **`mountSuspended` navigates to `/` by default.** Pass `{ route: '/?view=list' }` to mount on a different route.
 - **Node's `URL.createObjectURL` rejects happy-dom `File`s.** The add dialog guards it, and its tests stub it.
-- **E2E fixtures delete the `dardar-wardrobe` IndexedDB before each test,** so every test starts from the seed data.
+- **E2E fixtures call `POST /api/dev/reset` before each test,** so every test starts from the seed data. The e2e server runs with `NUXT_ALLOW_RESET=true` and a throwaway `.data-e2e`; a dev server on :3123 started without that flag makes the fixture fail loudly.
+- **Server code imports from `h3` explicitly** (not Nitro auto-imports), so the unit tests can run it outside Nitro. Only `server/api/[...].ts` uses Nitro globals.
+- **When stopping test servers,** use `pkill -f "[n]uxt dev --port 3123"`. A plain pattern also matches the shell running the command and kills it.

@@ -11,7 +11,7 @@ export default defineConfig({
         resolve: { alias: { '#shared': r('./shared'), '~': r('./app') } },
         test: {
           name: 'unit',
-          include: ['tests/unit/**/*.test.ts', 'tests/contracts/**/*.test.ts'],
+          include: ['tests/unit/**/*.test.ts', 'tests/contracts/**/*.test.ts', 'tests/server/**/*.test.ts'],
           environment: 'node',
           setupFiles: ['fake-indexeddb/auto'],
         },

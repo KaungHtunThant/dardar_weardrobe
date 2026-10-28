@@ -3,7 +3,8 @@ import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/c
 import { ItemDetailsSchema, type Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
-import { MockStyleAdvisor } from './mock/MockStyleAdvisor'
+import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
+import { lookFromSuggestion } from '#shared/utils/looks'
 import type { SnapshotStore, WardrobeSnapshot } from './persistence/SnapshotStore'
 
 export interface MockGatewayOptions {
@@ -13,7 +14,7 @@ export interface MockGatewayOptions {
   latencyMs?: number
   now?: () => Date
   newId?: () => string
-  /** Who completes and rates looks. Defaults to the rule-based prototype advisor. */
+  /** Who completes and rates looks. Defaults to the rule-based (offline) advisor. */
   advisor?: StyleAdvisor
 }
 
@@ -41,7 +42,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
     this.latencyMs = options.latencyMs ?? 0
     this.now = options.now ?? (() => new Date())
     this.newId = options.newId ?? (() => crypto.randomUUID())
-    this.advisor = options.advisor ?? new MockStyleAdvisor()
+    this.advisor = options.advisor ?? new RuleBasedStyleAdvisor()
   }
 
   private data() {
@@ -99,17 +100,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
     const request = StyleRequestSchema.parse(input)
     const data = await this.data()
     const suggestion = await this.advisor.suggestLook({ wardrobe: data.items, ...request })
-    const look: StyleMatch = {
-      id: `look-${this.newId()}`,
-      title: suggestion.title,
-      itemIds: suggestion.itemIds,
-      aiItemIds: suggestion.aiItemIds,
-      ...(request.prompt ? { prompt: request.prompt } : {}),
-      explanation: suggestion.explanation,
-      rating: suggestion.rating,
-      isFavourite: false,
-      createdAt: this.now().toISOString(),
-    }
+    const look = lookFromSuggestion(suggestion, request, `look-${this.newId()}`, this.now())
     data.styleMatches.push(look)
     await this.persist()
     await this.wait(6)

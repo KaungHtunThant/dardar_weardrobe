@@ -6,6 +6,8 @@ import type { StyleRequestInput } from '../models/styleRequest'
 export interface ProcessedPhoto {
   originalImage: string
   cleanImage: string
+  /** False when background removal failed and the clean image is just the original. */
+  backgroundRemoved?: boolean
 }
 
 export type CreateItemInput = ItemDetailsInput & ProcessedPhoto

@@ -26,7 +26,9 @@ async function startNitro(): Promise<string> {
       ...process.env,
       HOST: '127.0.0.1',
       PORT: String(port),
-      DATA_DIR: app.getPath('userData'),
+      NUXT_DATA_DIR: app.getPath('userData'),
+      NUXT_DEMO_SEED: 'false',
+      NUXT_ALLOW_RESET: 'false',
     },
     stdio: 'inherit',
   })

@@ -90,3 +90,28 @@ describe('look utils', () => {
     expect(resolveLookItems(l, items).map((i) => i.id)).toEqual(['c', 'a'])
   })
 })
+
+describe('lookFromSuggestion', () => {
+  it('turns an advisor suggestion into a saved look', async () => {
+    const { lookFromSuggestion } = await import('#shared/utils/looks')
+    const rating = { score: 5, verdict: 'Wearable. Forgettable.', works: [], fails: [], fixes: [] }
+    const look = lookFromSuggestion(
+      { title: 'T', itemIds: ['a', 'b'], aiItemIds: ['b'], explanation: 'E', rating },
+      { prompt: 'brunch' },
+      'look-1',
+      new Date('2026-10-28T10:00:00.000Z'),
+    )
+    expect(look).toEqual({
+      id: 'look-1',
+      title: 'T',
+      itemIds: ['a', 'b'],
+      aiItemIds: ['b'],
+      prompt: 'brunch',
+      explanation: 'E',
+      rating,
+      isFavourite: false,
+      createdAt: '2026-10-28T10:00:00.000Z',
+    })
+    expect(lookFromSuggestion({ title: 'T', itemIds: ['a'], aiItemIds: [], explanation: '', rating }, {}, 'x', new Date()).prompt).toBeUndefined()
+  })
+})

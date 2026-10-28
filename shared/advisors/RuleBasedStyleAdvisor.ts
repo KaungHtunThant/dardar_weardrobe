@@ -1,11 +1,12 @@
-import type { StyleAdvisor, StyleAdvisorRequest, StyleSuggestion } from '#shared/contracts/StyleAdvisor'
-import type { CategoryId } from '#shared/models/category'
-import { OCCASIONS, SEASONS, type Item, type Occasion, type Season } from '#shared/models/item'
-import type { StyleFix, StyleRating } from '#shared/models/styleMatch'
+import type { StyleAdvisor, StyleAdvisorRequest, StyleSuggestion } from '../contracts/StyleAdvisor'
+import type { CategoryId } from '../models/category'
+import { OCCASIONS, SEASONS, type Item, type Occasion, type Season } from '../models/item'
+import type { StyleFix, StyleRating } from '../models/styleMatch'
+import { ValidationError } from '../errors'
 
 /**
- * Prototype stand-in for the Claude advisor: deterministic, rule-based styling and a
- * deliberately blunt rating. Real styling arrives with the Claude providers in Phase 4.
+ * The "Offline" advisor: deterministic, rule-based styling and a deliberately blunt rating.
+ * Needs no network; the Claude CLI/API providers are the AI-backed alternatives.
  */
 
 const NEUTRALS = new Set([
@@ -107,13 +108,13 @@ function bestPick(pool: readonly Item[], look: readonly Item[], ctx: Context): I
   return [...pool].sort((a, b) => scoreCandidate(b, look, ctx) - scoreCandidate(a, look, ctx) || a.id.localeCompare(b.id))[0]
 }
 
-export class MockStyleAdvisor implements StyleAdvisor {
+export class RuleBasedStyleAdvisor implements StyleAdvisor {
   async suggestLook(request: StyleAdvisorRequest): Promise<StyleSuggestion> {
     const { wardrobe, prompt } = request
     const byId = new Map(wardrobe.map((i) => [i.id, i]))
     const pinned = request.pinnedItemIds.map((id) => {
       const item = byId.get(id)
-      if (!item) throw new Error(`Unknown piece: ${id}`)
+      if (!item) throw new ValidationError(`Unknown piece: ${id}`)
       return item
     })
 

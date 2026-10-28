@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { seedItems } from '#shared/fixtures/seed'
-import { MockStyleAdvisor } from '~/gateways/mock/MockStyleAdvisor'
+import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
 import { styleAdvisorContract } from './styleAdvisor.contract'
 
-styleAdvisorContract('MockStyleAdvisor', () => new MockStyleAdvisor())
+styleAdvisorContract('RuleBasedStyleAdvisor', () => new RuleBasedStyleAdvisor())
 
-const advisor = new MockStyleAdvisor()
+const advisor = new RuleBasedStyleAdvisor()
 const ask = (pinnedItemIds: string[], fillCategories: string[] = [], prompt?: string) =>
   advisor.suggestLook({ wardrobe: seedItems, pinnedItemIds, fillCategories: fillCategories as never, prompt })
 
-describe('MockStyleAdvisor heuristics', () => {
+describe('RuleBasedStyleAdvisor heuristics', () => {
   it('is brutal about a clashing, confused look', async () => {
     const look = await ask(['item-red-evening-dress', 'item-white-sneakers', 'item-straw-hat', 'item-lavender-cardigan'])
     expect(look.rating.score).toBeLessThanOrEqual(4)

@@ -1,4 +1,9 @@
+export interface ProcessedImage {
+  bytes: Uint8Array
+  mimeType: string
+}
+
 export interface ImageProcessor {
-  /** Returns a PNG of the garment only, with a transparent background. */
-  removeBackground(image: Uint8Array, mimeType: string): Promise<Uint8Array>
+  /** Returns the garment only, on a transparent background. */
+  removeBackground(image: Uint8Array, mimeType: string): Promise<ProcessedImage>
 }

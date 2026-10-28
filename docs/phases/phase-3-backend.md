@@ -1,6 +1,6 @@
 # Phase 3: Backend (controllers and persistence)
 
-**Status:** In progress
+**Status:** Done
 
 ## Goal
 Replace the mock gateway with a real local backend. It is a Nitro server inside the Nuxt app, run by Electron in production, that stores data in SQLite and images on disk. The frontend changes in one place only, `app/gateways/createGateway.ts`. Every screen, including the Style Studio, then runs on real persistence.
@@ -12,10 +12,12 @@ Replace the mock gateway with a real local backend. It is a Nitro server inside 
   - the tests, through a standalone h3 app.
   This way `HttpWardrobeGateway` can run the same `tests/contracts/wardrobeGateway.contract.ts` as the mock, in-process and without building Nuxt.
 - **The rule-based advisor moves** to `shared/advisors/RuleBasedStyleAdvisor.ts`, so the server can use it. The Studio's Generate works on the backend from day one, and the advisor stays as the "offline" option in Phase 4.
-- **Data directory:** `DATA_DIR`, which Electron sets to `userData`; in dev it defaults to `.data/`. It holds `dardar.db` and `images/`.
-- **Demo data:** `DARDAR_DEMO_SEED=1` (on for dev and e2e) seeds the demo wardrobe into an empty database. The packaged app starts empty.
-- **Test reset:** `POST /api/dev/reset` exists only when `DARDAR_ALLOW_RESET=1`. The e2e tests use it to start each test from seed data.
-- **Gateway selection:** `runtimeConfig.public.gateway` defaults to `http`. `NUXT_PUBLIC_GATEWAY=mock npm run dev:web` still runs the backend-free prototype.
+- **Configuration** is Nuxt `runtimeConfig`, overridable with environment variables:
+  - `NUXT_DATA_DIR` sets the data folder, holding `dardar.db` and `images/`. It defaults to `.data/` in dev; Electron sets it to `userData`.
+  - `NUXT_DEMO_SEED` seeds the demo wardrobe into an empty database. It is on in dev and off in the packaged app.
+  - `NUXT_ALLOW_RESET` enables `POST /api/dev/reset`, which only the e2e server turns on.
+- **Gateway selection:** `runtimeConfig.public.gateway` defaults to `http`. `npm run dev:mock` (`NUXT_PUBLIC_GATEWAY=mock`) still runs the backend-free prototype.
+- **Security:** the dev server binds to `127.0.0.1`, because the API has no authentication. Image ids are checked strictly against `uuid.ext`, so a request can't reach outside the image folder.
 
 ## Server layout (MVC + SOLID)
 ```
@@ -48,7 +50,34 @@ server/
 - `HttpWardrobeGateway` must pass the shared gateway contract, against an in-process h3 server built from the same route table.
 - The e2e suite runs unchanged on the HTTP gateway, with a temporary `DATA_DIR` and reset between tests.
 
+## What was built
+- `server/database/`:
+  - `schema.ts`: Drizzle tables.
+  - `migrations.ts`: versioned through `PRAGMA user_version`.
+  - `connection.ts`: `node:sqlite` exposed to Drizzle's sqlite-proxy, with WAL mode, auto-created folders and `clear()`.
+- `server/repositories/SqliteItemRepository.ts`, `SqliteStyleMatchRepository.ts`. Null columns map back to absent optional fields.
+- `server/infrastructure/FsImageStore.ts`: uuid file names, strict id check, immutable caching headers, and `pathOf()` for local tools.
+- `server/infrastructure/PassThroughImageProcessor.ts`.
+- `server/services/`:
+  - `ItemService`
+  - `PhotoService`: an image-only, 20 MB limit. If background removal fails it keeps the original, flagged with `backgroundRemoved: false`.
+  - `StyleMatchService`
+  - `StylingService`: validates the request and the picked pieces, resolves the advisor for each request, and saves the look.
+  - `demoSeed`
+  - `validation` (`parseOrThrow`)
+- **Domain errors** (`shared/errors.ts`) map to 400 and 404 in `server/http/errors.ts`. Anything unexpected becomes a 500 with no details exposed.
+- `server/controllers/*`, `server/http/routes.ts`, `server/api/[...].ts`, `server/bootstrap.ts`, `server/container.ts`.
+- `app/gateways/HttpWardrobeGateway.ts`. It surfaces server messages, for example "There is nothing to style yet…".
+- **Shared look-building:** `lookFromSuggestion()` refuses empty looks (a bug found while smoke-testing an empty production wardrobe).
+
+## Tests
+- Repository contracts run on in-memory SQLite.
+- Server service tests run with temporary folders.
+- **Gateway contract over HTTP:** `HttpWardrobeGateway` passes the same suite as the mock, against the real route table on an in-process h3 server (`tests/server/harness.ts`).
+- API tests cover image serving, 400/404 mapping, the path-escape attempt, and the reset guard.
+- **The 16 e2e flows now run against the real backend:** a throwaway `.data-e2e` folder, reset before each test.
+- **Production smoke test:** with `NODE_ENV=production`, Electron starts the built Nitro server (on Electron's Node 24, `node:sqlite` included) on a random port, and the window loads from it with an empty wardrobe.
+
 ## Verification
-- `npm test` and `npm run test:e2e` pass with `gateway: 'http'`.
-- Data survives an app restart: it lives in SQLite and on disk, not in IndexedDB.
-- `npm run build` produces a Nitro server that Electron starts in production.
+- `npm test`, `npm run test:e2e`, `npm run lint` and `npm run typecheck` all pass. That's 190 unit and component tests and 16 e2e tests.
+- `npm run build`, then launching Electron in production mode, serves the app from its own Nitro server.

@@ -1,3 +1,5 @@
+import type { StyleSuggestion } from '../contracts/StyleAdvisor'
+import { ValidationError } from '../errors'
 import type { Item } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
 import { sortNewestFirst } from './wardrobe'
@@ -27,4 +29,26 @@ export function todaysPick(looks: readonly StyleMatch[], date: string): StyleMat
 export function resolveLookItems(look: StyleMatch, items: readonly Item[]): Item[] {
   const byId = new Map(items.map((i) => [i.id, i]))
   return look.itemIds.flatMap((id) => byId.get(id) ?? [])
+}
+
+/** The saved look for an advisor's suggestion (used by every gateway/back end that generates looks). */
+export function lookFromSuggestion(
+  suggestion: StyleSuggestion,
+  request: { prompt?: string },
+  id: string,
+  now: Date,
+): StyleMatch {
+  if (suggestion.itemIds.length === 0)
+    throw new ValidationError('There is nothing to style yet. Add some pieces to your wardrobe first.')
+  return {
+    id,
+    title: suggestion.title,
+    itemIds: suggestion.itemIds,
+    aiItemIds: suggestion.aiItemIds,
+    ...(request.prompt ? { prompt: request.prompt } : {}),
+    explanation: suggestion.explanation,
+    rating: suggestion.rating,
+    isFavourite: false,
+    createdAt: now.toISOString(),
+  }
 }

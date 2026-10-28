@@ -4,6 +4,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   ssr: false,
   devtools: { enabled: false },
+  // The local API has no authentication: never expose the dev server to the network.
+  devServer: { host: '127.0.0.1' },
+  nitro: { rollupConfig: { external: ['node:sqlite'] } },
   modules: ['@pinia/nuxt', '@nuxt/icon', '@nuxt/fonts', '@nuxt/eslint', '@nuxt/test-utils/module'],
   css: ['~/assets/css/main.css'],
   vite: { plugins: [tailwindcss()] },
@@ -26,8 +29,13 @@ export default defineNuxtConfig({
     ],
   },
   runtimeConfig: {
+    // Server-only; override with NUXT_DATA_DIR / NUXT_DEMO_SEED / NUXT_ALLOW_RESET.
+    dataDir: '.data',
+    demoSeed: true,
+    allowReset: false,
     public: {
-      gateway: 'mock',
+      // 'http' = local Nitro API; 'mock' = backend-free prototype (NUXT_PUBLIC_GATEWAY=mock).
+      gateway: 'http',
     },
   },
 })

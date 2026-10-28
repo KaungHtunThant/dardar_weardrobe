@@ -15,7 +15,8 @@ export const test = base.extend<{ app: ElectronApplication; page: Page }>({
     const page = await app.firstWindow()
     await page.waitForLoadState('networkidle')
     // Each test starts from fresh seed data.
-    await page.evaluate(() => indexedDB.deleteDatabase('dardar-wardrobe'))
+    const res = await fetch('http://localhost:3123/api/dev/reset', { method: 'POST' })
+    if (!res.ok) throw new Error(`Reset failed (${res.status}). Is a dev server without NUXT_ALLOW_RESET on :3123?`)
     await page.reload()
     await page.waitForLoadState('networkidle')
     await use(page)
