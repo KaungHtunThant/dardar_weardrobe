@@ -1,6 +1,6 @@
 # Phase 5: Manage pieces, Looks library, faster-feeling AI, installer
 
-**Status:** Done (Windows CI build pending its first run)
+**Status:** Done
 
 The user chose all four next steps after Phase 4. The plan below is the approved one.
 
@@ -93,6 +93,10 @@ Cancel during a live run saved nothing, showed no error, and left no `claude` pr
 3. Styles it with the Offline stylist and shows a score.
 4. API key: with a keychain, it is saved, encrypted (the file holds no `sk-ant`), and still there after a restart. Without one, the field is disabled and explained, and no key file is written. This machine took the second path.
 5. Restarts: the piece is still in the wardrobe.
+
+The test gets its fresh data folder from `DARDAR_USER_DATA`, which the main process honours before startup. Faking the user profile instead (`USERPROFILE`/`APPDATA`) crashed Chromium on Windows.
+
+**CI** (run 40719202233): Windows and Linux both pass the unit tests, the installer build and this smoke test, and attach the installers: `.exe` 216 MB, AppImage 213 MB. electron-builder runs with `--publish never`, because otherwise it tries to publish a GitHub release from CI.
 
 The AppImage file itself was also launched with a clean profile (`APPIMAGE_EXTRACT_AND_RUN=1`) and opened on an empty Home.
 

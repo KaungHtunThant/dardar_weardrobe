@@ -27,7 +27,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | 2: UI prototype | Done, awaiting review | `1e0c0a4`, `a9fe6aa`, `745e576`, `079603e`, `09b754b`, `5cd5013` |
 | 3: Backend | Done | `8c238ef` |
 | 4: AI | Done | `4072a35`, `e8f0760`, `879c622` |
-| 5: Manage, library, streaming, installer | Done | `60d0b16`, `5de3875`, `31a6317`, Step 4 |
+| 5: Manage, library, streaming, installer | Done | `60d0b16`, `5de3875`, `31a6317`, `4bf1da1` (+ CI fixes) |
 
 ## Running the app
 
