@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { useRoute } from '#imports'
 import { CATEGORIES, type CategoryId } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
 import type { StyleFix } from '#shared/models/styleMatch'
@@ -59,6 +60,7 @@ export function useStudioPage() {
   const looks = useStyleMatchesStore()
   const settings = useSettingsStore()
   const sheet = useItemSheetRoute()
+  const route = useRoute()
 
   const outfitIds = ref<string[]>([])
   const aiIds = ref<string[]>([])
@@ -190,8 +192,22 @@ export function useStudioPage() {
     panelTab.value = 'wardrobe'
   }
 
-  function init() {
-    return Promise.all([wardrobe.load(), looks.load(), settings.load()])
+  /** Puts a saved look back on the form with its verdict (from the Looks library: `?look=<id>`). */
+  function openLook(id: string) {
+    const look = looks.byId(id)
+    if (!look) return
+    outfitIds.value = [...look.itemIds]
+    aiIds.value = [...(look.aiItemIds ?? [])]
+    prompt.value = look.prompt ?? ''
+    resultId.value = look.id
+    stale.value = false
+    panelTab.value = look.rating ? 'verdict' : 'wardrobe'
+  }
+
+  async function init() {
+    await Promise.all([wardrobe.load(), looks.load(), settings.load()])
+    const lookId = (route.query as Record<string, string | undefined>).look
+    if (lookId) openLook(lookId)
   }
 
   onViewMounted(init)

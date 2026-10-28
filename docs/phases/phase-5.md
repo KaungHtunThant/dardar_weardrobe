@@ -1,6 +1,6 @@
 # Phase 5: Manage pieces, Looks library, faster-feeling AI, installer
 
-**Status:** In progress (Step 1 done)
+**Status:** In progress (Steps 1–2 done)
 
 The user chose all four next steps after Phase 4. The plan below is the approved one.
 
@@ -31,9 +31,14 @@ The user chose all four next steps after Phase 4. The plan below is the approved
   - stores, the sheet and page services;
   - e2e (`manage-pieces.spec.ts`): edit moves the piece to its new closet; Back closes the sheet; delete from a closet removes it from looks and Home; the Studio ⓘ opens the sheet while tapping the tile still wears the piece.
 
-## Step 2: Looks library (planned)
-- A `/looks` page: filters (All, Favourites, Rated, Daily picks) and sorting (newest, highest score, lowest score).
-- Card actions: favourite, Open in Studio (`/studio?look=<id>` loads the look and its verdict), Delete (with confirmation).
+## Step 2: Looks library (done)
+- **`/looks`** (`app/pages/looks.vue` + `app/services/pages/looks.service.ts`), linked in the nav between Studio and Wardrobe.
+- **Filters:** All, Favourites, Rated, Daily picks, each with a count. **Sort:** Newest, Best, Worst. Unrated looks always sort last; newest wins ties. Both live in the URL (`?filter=favourites&sort=score-desc`), so Back and reload keep them.
+- **Cards** reuse `home/LookCard.vue`, which gained an optional `actions` prop: **Open in Studio** and **Delete**. The heart (favourite) works as on Home.
+- **Open in Studio** pushes `/studio?look=<id>`. `useStudioPage.init` calls `openLook()`, which puts the look's pieces on the dress form, restores its AI badges and opens its verdict. Changing a piece marks the verdict stale, as before.
+- **Delete** asks for confirmation (`UiDialog size="sm"`). Deleting today's pick is allowed; Home styles a new one the next time it loads, and the dialog says so.
+- **Pure functions:** `filterLooks()` and `sortLooks()` in `shared/utils/looks.ts`.
+- **Tests:** utils; the page service (filter and sort in the URL, open, delete); Studio `?look=` loading; a page render test; e2e (`looks.spec.ts`: filter favourites, open in Studio shows the verdict, delete).
 
 ## Step 3: Faster-feeling AI (planned)
 - An SSE endpoint `POST /api/looks/generate/stream` with stages and partial picks. The CLI uses stream-json with partial messages; the API uses `messages.stream`.

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { useRouter } from '#imports'
 import { useStudioPage } from '~/services/pages/studio.service'
 import { setupTestGateway } from '../../helpers'
 
@@ -119,5 +120,22 @@ describe('studio page service', () => {
   it('names the active stylist', async () => {
     const vm = await ready()
     expect(vm.stylistLabel.value).toBe('Offline rules')
+  })
+
+  it('reopens a saved look from the library with its verdict', async () => {
+    const look = await useStudioPage().init().then(async () => {
+      const vm = useStudioPage()
+      await vm.init()
+      await vm.generate()
+      return vm.result.value!
+    })
+    await useRouter().replace({ path: '/', query: { look: look.id } })
+    const vm = useStudioPage()
+    await vm.init()
+    expect(vm.placed.value.map((p) => p.item.id)).toEqual(look.itemIds)
+    expect(vm.result.value!.id).toBe(look.id)
+    expect(vm.panelTab.value).toBe('verdict')
+    expect(vm.placed.value.filter((p) => p.isAi).map((p) => p.item.id)).toEqual(look.aiItemIds)
+    await useRouter().replace({ path: '/', query: {} })
   })
 })

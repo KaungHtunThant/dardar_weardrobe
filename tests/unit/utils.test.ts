@@ -141,3 +141,27 @@ describe('withoutItem', () => {
     expect(withoutItem(l, 'z')).toBe(l)
   })
 })
+
+describe('filterLooks / sortLooks', () => {
+  const rate = (score: number) => ({ score, verdict: 'v', works: [], fails: [], fixes: [] })
+  const all = [
+    look('a', '2026-10-01T00:00:00.000Z', { isFavourite: true, rating: rate(4) }),
+    look('b', '2026-10-03T00:00:00.000Z', { dailyPickDate: '2026-10-03', rating: rate(8) }),
+    look('c', '2026-10-02T00:00:00.000Z'),
+  ]
+
+  it('filters by favourites, rated looks and daily picks', async () => {
+    const { filterLooks } = await import('#shared/utils/looks')
+    expect(filterLooks(all, 'all').map((l) => l.id)).toEqual(['a', 'b', 'c'])
+    expect(filterLooks(all, 'favourites').map((l) => l.id)).toEqual(['a'])
+    expect(filterLooks(all, 'rated').map((l) => l.id)).toEqual(['a', 'b'])
+    expect(filterLooks(all, 'daily').map((l) => l.id)).toEqual(['b'])
+  })
+
+  it('sorts by date or score, with unrated looks last', async () => {
+    const { sortLooks } = await import('#shared/utils/looks')
+    expect(sortLooks(all, 'newest').map((l) => l.id)).toEqual(['b', 'c', 'a'])
+    expect(sortLooks(all, 'score-desc').map((l) => l.id)).toEqual(['b', 'a', 'c'])
+    expect(sortLooks(all, 'score-asc').map((l) => l.id)).toEqual(['a', 'b', 'c'])
+  })
+})

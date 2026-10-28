@@ -2,8 +2,8 @@
 import { useLookCard } from '~/services/components/home/LookCard.service'
 import type { LookWithItems } from '~/services/pages/index.service'
 
-const props = defineProps<{ entry: LookWithItems }>()
-defineEmits<{ 'toggle-favourite': [id: string] }>()
+const props = defineProps<{ entry: LookWithItems; actions?: boolean }>()
+defineEmits<{ 'toggle-favourite': [id: string]; open: [id: string]; delete: [id: string] }>()
 const vm = useLookCard(props)
 </script>
 
@@ -25,6 +25,24 @@ const vm = useLookCard(props)
         class="-mt-1 shrink-0"
         @click="$emit('toggle-favourite', entry.look.id)"
       />
+    </div>
+    <div v-if="actions" class="mt-2 flex gap-1 px-1">
+      <button
+        type="button"
+        class="flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs text-ink transition-colors hover:border-blush"
+        :aria-label="`Open ${entry.look.title} in the Studio`"
+        @click="$emit('open', entry.look.id)"
+      >
+        <Icon name="lucide:wand-sparkles" class="size-3.5 text-rose" /> Open in Studio
+      </button>
+      <button
+        type="button"
+        class="h-8 rounded-full px-3 text-xs text-taupe transition-colors hover:bg-blush-soft hover:text-rose"
+        :aria-label="`Delete ${entry.look.title}`"
+        @click="$emit('delete', entry.look.id)"
+      >
+        Delete
+      </button>
     </div>
   </article>
 </template>

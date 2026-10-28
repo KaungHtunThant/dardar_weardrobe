@@ -70,3 +70,30 @@ export function lookFromSuggestion(
     createdAt: now.toISOString(),
   }
 }
+
+export type LookFilter = 'all' | 'favourites' | 'rated' | 'daily'
+export type LookSort = 'newest' | 'score-desc' | 'score-asc'
+
+export function filterLooks(looks: readonly StyleMatch[], filter: LookFilter): StyleMatch[] {
+  switch (filter) {
+    case 'favourites':
+      return looks.filter((l) => l.isFavourite)
+    case 'rated':
+      return looks.filter((l) => l.rating)
+    case 'daily':
+      return looks.filter((l) => l.dailyPickDate)
+    default:
+      return [...looks]
+  }
+}
+
+/** Newest first, or by score (unrated looks always last, newest first among equals). */
+export function sortLooks(looks: readonly StyleMatch[], sort: LookSort): StyleMatch[] {
+  const newest = sortNewestFirst(looks)
+  if (sort === 'newest') return newest
+  const dir = sort === 'score-desc' ? -1 : 1
+  return [...newest].sort((a, b) => {
+    if (!a.rating || !b.rating) return Number(!a.rating) - Number(!b.rating)
+    return dir * (a.rating.score - b.rating.score)
+  })
+}
