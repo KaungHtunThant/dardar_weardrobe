@@ -15,7 +15,7 @@ export type StyleFix = z.infer<typeof StyleFixSchema>
 /** The advisor's brutally honest verdict on a look. */
 export const StyleRatingSchema = z.object({
   score: z.number().int().min(1).max(10),
-  verdict: z.string().trim().min(1).max(200),
+  verdict: z.string().trim().min(1).max(400),
   works: z.array(line).max(6),
   fails: z.array(line).max(6),
   fixes: z.array(StyleFixSchema).max(4),
