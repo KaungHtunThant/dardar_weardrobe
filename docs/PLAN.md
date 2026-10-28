@@ -1,3 +1,10 @@
+> **Status (2026-10-28):** Phases 0–2 are done, and the UI prototype is waiting for review. Phases 3–4 are planned.
+> The per-phase write-ups are in [`phases/`](phases/), and the conventions are in [`architecture.md`](architecture.md).
+>
+> Changes from this plan made during implementation:
+> - shadcn-nuxt was replaced by **reka-ui** used directly, with a few in-house primitives in `app/components/ui/`.
+> - The add-item component is `app/components/item/AddDialog.vue`, because of Nuxt component naming.
+
 # Dardar Wardrobe: tech stack and phased plan
 
 ## Context
