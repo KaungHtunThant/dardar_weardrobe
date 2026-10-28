@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens — "boutique backdrop".
+ * The UI stays quiet so the clothes carry the colour. Blush is the only accent;
+ * gold appears only in tiny details (closet handles).
+ */
+@theme {
+  --color-ivory: #fbf8f5;
+  --color-cream: #f5efea;
+  --color-cream-deep: #ece3dc;
+  --color-surface: #ffffff;
+  --color-ink: #2e2a28;
+  --color-taupe: #8c817a;
+  --color-line: #ebe2db;
+  --color-blush: #d8a7a7;
+  --color-blush-soft: #f3e3e1;
+  --color-rose: #b9787e;
+  --color-gold: #c9a96e;
+
+  --font-display: 'Cormorant Garamond', ui-serif, Georgia, serif;
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --shadow-soft: 0 1px 2px rgb(46 42 40 / 0.04), 0 8px 24px -12px rgb(46 42 40 / 0.12);
+  --shadow-garment: 0 10px 14px rgb(46 42 40 / 0.14);
+}
+
+@layer base {
+  html,
+  body {
+    @apply bg-ivory text-ink font-sans antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blush);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Transparent garment PNGs float on the backdrop with a soft shadow, never framed. */
+  .garment {
+    filter: drop-shadow(var(--shadow-garment));
+    object-fit: contain;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
