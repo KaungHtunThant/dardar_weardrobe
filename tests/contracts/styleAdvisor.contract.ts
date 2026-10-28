@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { StyleAdvisor, StyleAdvisorRequest } from '#shared/contracts/StyleAdvisor'
+import type { StyleAdvisor, StyleAdvisorRequest, StyleCallOptions, StyleProgress } from '#shared/contracts/StyleAdvisor'
 import { StyleRatingSchema } from '#shared/models/styleMatch'
 import { seedItems } from '#shared/fixtures/seed'
 
 const byId = new Map(seedItems.map((i) => [i.id, i]))
-const ask = (advisor: StyleAdvisor, req: Partial<StyleAdvisorRequest>) =>
-  advisor.suggestLook({ wardrobe: seedItems, pinnedItemIds: [], fillCategories: [], ...req })
+const ask = (advisor: StyleAdvisor, req: Partial<StyleAdvisorRequest>, options?: StyleCallOptions) =>
+  advisor.suggestLook({ wardrobe: seedItems, pinnedItemIds: [], fillCategories: [], ...req }, options)
 
 /** Behaviour every StyleAdvisor must share: the mock now, the Claude CLI/API providers in Phase 4. */
 export function styleAdvisorContract(name: string, make: () => StyleAdvisor) {
@@ -57,6 +57,16 @@ export function styleAdvisorContract(name: string, make: () => StyleAdvisor) {
         if (fix.removeItemId) expect(look.itemIds).toContain(fix.removeItemId)
       }
       expect(look.title.trim()).not.toBe('')
+    })
+
+    it('reports progress only with pieces it really adds, in order', async () => {
+      const progress: StyleProgress[] = []
+      const look = await ask(make(), { pinnedItemIds: ['item-linen-tee'], fillCategories: ['bottoms', 'shoes', 'bags'] }, { onProgress: (p) => progress.push(p) })
+      for (const p of progress) expect(look.aiItemIds.slice(0, p.aiItemIds.length)).toEqual(p.aiItemIds)
+    })
+
+    it('stops with an AbortError when cancelled, without answering', async () => {
+      await expect(ask(make(), { fillCategories: ['tops', 'bottoms'] }, { signal: AbortSignal.abort() })).rejects.toMatchObject({ name: 'AbortError' })
     })
 
     it('rejects picks that are not in the wardrobe', async () => {

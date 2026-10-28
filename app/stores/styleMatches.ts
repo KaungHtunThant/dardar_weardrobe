@@ -4,6 +4,7 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
 import { favouriteLooks, recentLooks, todaysPick } from '#shared/utils/looks'
 import { useGateway } from '~/gateways/provider'
+import type { StyleProgress } from '#shared/contracts/StyleAdvisor'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -16,6 +17,9 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
   const todayId = ref<string | null>(null)
   const todayLoading = ref(false)
   const generateError = ref<string | null>(null)
+  /** What the stylist has produced so far while generating. */
+  const progress = ref<StyleProgress | null>(null)
+  let styling: AbortController | null = null
   let inFlight: Promise<void> | null = null
 
   const favourites = computed(() => favouriteLooks(looks.value))
@@ -97,23 +101,43 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     todayId.value = null
   }
 
+  /** Styles a look, reporting progress; returns null on failure or when cancelled (which is not an error). */
   async function generate(request: StyleRequestInput): Promise<StyleMatch | null> {
+    styling?.abort()
+    const mine = new AbortController()
+    styling = mine
     generating.value = true
     generateError.value = null
+    progress.value = null
     try {
-      const look = await useGateway().generateLook(request)
+      const look = await useGateway().generateLook(request, {
+        signal: mine.signal,
+        onProgress: (p) => {
+          if (styling === mine) progress.value = p
+        },
+      })
       looks.value = [...looks.value, look]
       return look
     } catch (e) {
-      generateError.value = message(e)
+      if (!mine.signal.aborted) generateError.value = message(e)
       return null
     } finally {
-      generating.value = false
+      if (styling === mine) {
+        styling = null
+        generating.value = false
+        progress.value = null
+      }
     }
+  }
+
+  function cancelGenerate() {
+    styling?.abort()
   }
 
   return {
     looks,
+    progress,
+    cancelGenerate,
     favourites,
     loaded,
     loading,

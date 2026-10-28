@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parsePartialJson } from './partialJson'
 import type { ProcessRunner } from './process'
 
 export interface ClaudeCliOptions {
@@ -22,18 +23,92 @@ export function cliJsonSchema(schema: z.ZodType): object {
   return rest
 }
 
+interface StreamLine {
+  type?: string
+  event?: {
+    type?: string
+    index?: number
+    content_block?: { type?: string; name?: string }
+    delta?: { type?: string; partial_json?: string }
+  }
+}
+
+/** The CLI delivers --json-schema output as the input of this tool call. */
+const STRUCTURED_OUTPUT_TOOL = 'StructuredOutput'
+
+/**
+ * Reads `--output-format stream-json --include-partial-messages` as it arrives and reports the
+ * structured output parsed so far each time a piece of it streams in.
+ */
+function structuredOutputStream(onPartial: (partial: unknown) => void) {
+  let pending = ''
+  let blockIndex: number | undefined
+  let json = ''
+  const line = (text: string) => {
+    let msg: StreamLine
+    try {
+      msg = JSON.parse(text) as StreamLine
+    } catch {
+      return
+    }
+    const e = msg.type === 'stream_event' ? msg.event : undefined
+    if (e?.type === 'content_block_start' && e.content_block?.type === 'tool_use' && e.content_block.name === STRUCTURED_OUTPUT_TOOL) {
+      blockIndex = e.index
+      json = ''
+    } else if (e?.type === 'content_block_delta' && e.index === blockIndex && e.delta?.type === 'input_json_delta') {
+      json += e.delta.partial_json ?? ''
+      const partial = parsePartialJson(json)
+      if (partial !== undefined) onPartial(partial)
+    }
+  }
+  return (chunk: string) => {
+    pending += chunk
+    let nl
+    while ((nl = pending.indexOf('\n')) >= 0) {
+      line(pending.slice(0, nl))
+      pending = pending.slice(nl + 1)
+    }
+  }
+}
+
+/** The final `result` message of a stream-json run. */
+function lastResult(stdout: string): CliResult {
+  const lines = stdout.trim().split('\n').reverse()
+  for (const l of lines) {
+    try {
+      const msg = JSON.parse(l) as CliResult
+      if (msg.type === 'result') return msg
+    } catch {
+      // not a complete JSON line
+    }
+  }
+  throw new Error('Claude CLI ended without a result.')
+}
+
 /**
  * Runs `claude -p` once with a JSON schema and returns the validated structured output.
  * The prompt goes over stdin; tools are off unless explicitly allowed.
+ * With `onPartial`, the answer is streamed and reported as it is written; `signal` kills the process.
  */
 export async function runClaudeCli<S extends z.ZodType>(
   options: ClaudeCliOptions,
-  call: { system: string; prompt: string; schema: S; jsonSchema: object; tools?: string[]; addDirs?: string[] },
+  call: {
+    system: string
+    prompt: string
+    schema: S
+    jsonSchema: object
+    tools?: string[]
+    addDirs?: string[]
+    signal?: AbortSignal
+    onPartial?: (partial: unknown) => void
+  },
 ): Promise<z.output<S>> {
   const command = options.command ?? 'claude'
+  const streaming = !!call.onPartial
   const args = [
     '-p',
-    '--output-format', 'json',
+    '--output-format', streaming ? 'stream-json' : 'json',
+    ...(streaming ? ['--verbose', '--include-partial-messages'] : []),
     '--json-schema', JSON.stringify(call.jsonSchema),
     '--system-prompt', call.system,
     '--tools', (call.tools ?? []).join(','),
@@ -45,7 +120,11 @@ export async function runClaudeCli<S extends z.ZodType>(
 
   let out
   try {
-    out = await options.runner(command, args, { input: call.prompt })
+    out = await options.runner(command, args, {
+      input: call.prompt,
+      signal: call.signal,
+      onStdout: call.onPartial ? structuredOutputStream(call.onPartial) : undefined,
+    })
   } catch (e) {
     if ((e as { code?: string }).code === 'ENOENT')
       throw new Error("The Claude CLI isn't installed (or not on PATH). Install Claude Code, or switch to API or Offline in Settings.", { cause: e })
@@ -55,7 +134,7 @@ export async function runClaudeCli<S extends z.ZodType>(
 
   let result: CliResult
   try {
-    result = JSON.parse(out.stdout) as CliResult
+    result = streaming ? lastResult(out.stdout) : (JSON.parse(out.stdout) as CliResult)
   } catch (e) {
     throw new Error('Claude CLI returned something that is not JSON.', { cause: e })
   }

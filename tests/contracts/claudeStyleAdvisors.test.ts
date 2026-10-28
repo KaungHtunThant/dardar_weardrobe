@@ -1,21 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import { seedItems } from '#shared/fixtures/seed'
-import { ClaudeApiStyleAdvisor, type StructuredMessages } from '../../server/ai/ClaudeApiStyleAdvisor'
+import type { StyleProgress } from '#shared/contracts/StyleAdvisor'
+import { ClaudeApiStyleAdvisor, type StreamingMessages } from '../../server/ai/ClaudeApiStyleAdvisor'
 import { ClaudeCliStyleAdvisor } from '../../server/ai/ClaudeCliStyleAdvisor'
 import type { ProcessRunner } from '../../server/ai/process'
-import { fakeModel } from '../server/fakeModel'
+import { cliStreamJson, fakeModel, textSnapshots } from '../server/fakeModel'
 import { styleAdvisorContract } from './styleAdvisor.contract'
 
-const cliRunner: ProcessRunner = async (_cmd, _args, { input }) => ({
-  code: 0,
-  stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: await fakeModel(input ?? '') }),
-  stderr: '',
-})
+/** Answers like `claude -p`: plain JSON, or stream-json fed through onStdout when asked to stream. */
+const cliRunner: ProcessRunner = async (_cmd, args, { input, signal, onStdout }) => {
+  signal?.throwIfAborted()
+  const answer = await fakeModel(input ?? '')
+  if (!args.includes('stream-json'))
+    return { code: 0, stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: answer }), stderr: '' }
+  const stdout = cliStreamJson(answer)
+  for (let i = 0; i < stdout.length; i += 50) onStdout?.(stdout.slice(i, i + 50))
+  return { code: 0, stdout, stderr: '' }
+}
 
-const apiMessages: StructuredMessages = {
-  async parse(params) {
-    const text = params.messages[0]!.content as string
-    return { stop_reason: 'end_turn', parsed_output: await fakeModel(text) }
+/** Streams like `client.beta.messages.stream()` with structured output: text snapshots, then the parsed message. */
+function fakeStream(answer: () => Promise<unknown>, signal?: AbortSignal, stopReason = 'end_turn') {
+  const listeners: ((delta: string, snapshot: string) => void)[] = []
+  return {
+    on(_event: 'text', listener: (delta: string, snapshot: string) => void) {
+      listeners.push(listener)
+      return this
+    },
+    async finalMessage() {
+      if (signal?.aborted) throw Object.assign(new Error('Request was aborted.'), { name: 'APIUserAbortError' })
+      const parsed = await answer()
+      for (const snap of textSnapshots(parsed)) for (const l of listeners) l('', snap)
+      return { stop_reason: stopReason, parsed_output: stopReason === 'refusal' ? null : parsed }
+    },
+  }
+}
+
+const apiMessages: StreamingMessages = {
+  stream(params, options) {
+    return fakeStream(() => fakeModel(params.messages[0]!.content as string), options?.signal)
   },
 }
 
@@ -47,12 +69,25 @@ describe('Claude style advisors', () => {
     await expect(ask(new ClaudeCliStyleAdvisor({ runner: missing }))).rejects.toThrow(/isn't installed/)
   })
 
+  it('streams progress from both providers, ending on the verdict', async () => {
+    for (const advisor of [new ClaudeCliStyleAdvisor({ runner: cliRunner }), new ClaudeApiStyleAdvisor({ messages: apiMessages })]) {
+      const progress: StyleProgress[] = []
+      const look = await advisor.suggestLook(
+        { wardrobe: seedItems, pinnedItemIds: ['item-linen-tee'], fillCategories: ['bottoms', 'shoes'] },
+        { onProgress: (p) => progress.push(p) },
+      )
+      expect(progress.length).toBeGreaterThan(3)
+      expect(progress[0]!.stage).toBe('picking')
+      expect(progress.at(-1)).toMatchObject({ stage: 'rating', aiItemIds: look.aiItemIds, verdict: look.rating.verdict })
+    }
+  })
+
   it('asks the API for structured output with fallbacks and handles refusals', async () => {
-    let params: Parameters<StructuredMessages['parse']>[0] | undefined
-    const messages: StructuredMessages = {
-      async parse(p) {
+    let params: Parameters<StreamingMessages['stream']>[0] | undefined
+    const messages: StreamingMessages = {
+      stream(p) {
         params = p
-        return { stop_reason: 'refusal', parsed_output: null }
+        return fakeStream(async () => ({}), undefined, 'refusal')
       },
     }
     await expect(ask(new ClaudeApiStyleAdvisor({ messages }))).rejects.toThrow(/declined/)

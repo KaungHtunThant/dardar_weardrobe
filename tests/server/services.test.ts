@@ -15,6 +15,7 @@ import { ItemService } from '../../server/services/ItemService'
 import { PhotoService } from '../../server/services/PhotoService'
 import { StyleMatchService } from '../../server/services/StyleMatchService'
 import { StylingService } from '../../server/services/StylingService'
+import type { StyleAdvisor, StyleProgress } from '#shared/contracts/StyleAdvisor'
 import { seedIfEmpty } from '../../server/services/demoSeed'
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
@@ -109,6 +110,37 @@ describe('StylingService', () => {
     expect(look).toMatchObject({ id: 'look-fixed', prompt: 'coffee' })
     expect(look.rating?.score).toBeGreaterThanOrEqual(1)
     expect(await looks.findById('look-fixed')).toEqual(look)
+  })
+
+  it('reports reading first, then the stylist\'s own progress', async () => {
+    const r = await setup()
+    const advisor: StyleAdvisor = {
+      suggestLook(req, options) {
+        options?.onProgress?.({ stage: 'picking', aiItemIds: [] })
+        return new RuleBasedStyleAdvisor().suggestLook(req)
+      },
+    }
+    const service = new StylingService(r.items, r.looks, () => advisor, clock)
+    const progress: StyleProgress[] = []
+    await service.generate({ pinnedItemIds: ['item-linen-tee'], fillCategories: ['shoes'] }, { onProgress: (p) => progress.push(p) })
+    expect(progress).toEqual([
+      { stage: 'reading', aiItemIds: [] },
+      { stage: 'picking', aiItemIds: [] },
+    ])
+  })
+
+  it('saves nothing when cancelled, even if the stylist answers anyway', async () => {
+    const r = await setup()
+    const controller = new AbortController()
+    const stubborn: StyleAdvisor = {
+      suggestLook(req) {
+        controller.abort()
+        return new RuleBasedStyleAdvisor().suggestLook(req)
+      },
+    }
+    const service = new StylingService(r.items, r.looks, () => stubborn, clock)
+    await expect(service.generate({ fillCategories: ['tops'] }, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(await r.looks.findAll()).toHaveLength(0)
   })
 
   it('rejects empty requests and unknown pieces', async () => {

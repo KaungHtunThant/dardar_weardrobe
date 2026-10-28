@@ -17,7 +17,11 @@ const vm = useStudioPage()
 
       <div class="pointer-events-none absolute top-6 left-8 max-w-sm">
         <h1 class="font-display text-4xl font-medium text-ink">Style Studio</h1>
-        <p v-if="!vm.result.value" class="mt-1 text-sm text-taupe">Build an outfit, let the AI fill the gaps — then hear the honest truth.</p>
+        <div v-if="vm.busy.value" aria-live="polite" data-testid="live-look">
+          <p class="mt-2 min-h-8 font-display text-2xl text-ink/80">{{ vm.liveTitle.value }}</p>
+          <p v-if="vm.liveVerdict.value" class="mt-1 text-sm italic leading-relaxed text-taupe">“{{ vm.liveVerdict.value }}”</p>
+        </div>
+        <p v-else-if="!vm.result.value" class="mt-1 text-sm text-taupe">Build an outfit, let the AI fill the gaps — then hear the honest truth.</p>
         <template v-else>
           <p class="mt-2 font-display text-2xl text-ink" data-testid="look-title">{{ vm.result.value.title }}</p>
           <p class="text-sm text-taupe">
@@ -120,14 +124,26 @@ const vm = useStudioPage()
           placeholder="Describe the vibe — optional"
           class="h-10 w-full rounded-xl border border-line bg-ivory px-4 text-sm text-ink placeholder:text-taupe/60 focus:border-blush focus:outline-none"
         >
+        <div v-if="vm.busy.value" class="flex h-11 items-center gap-3 rounded-full bg-blush-soft pr-1.5 pl-5" data-testid="styling-progress">
+          <Icon name="lucide:loader-circle" class="size-4 shrink-0 animate-spin text-rose" />
+          <span role="status" class="min-w-0 flex-1 truncate text-sm text-ink">{{ vm.progressLabel.value }}</span>
+          <button
+            type="button"
+            class="h-8 shrink-0 rounded-full bg-surface px-4 text-sm text-taupe transition-colors hover:text-ink"
+            @click="vm.cancel"
+          >
+            Cancel
+          </button>
+        </div>
         <button
+          v-else
           type="button"
           :disabled="!vm.canGenerate.value"
           class="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-rose text-sm font-medium tracking-wide text-white transition-colors hover:bg-[#ad6b72] disabled:cursor-not-allowed disabled:opacity-50"
           @click="vm.generate"
         >
-          <Icon :name="vm.busy.value ? 'lucide:loader-circle' : 'lucide:sparkles'" class="size-4" :class="vm.busy.value ? 'animate-spin' : ''" />
-          {{ vm.busy.value ? 'Styling… and judging' : 'Generate & rate' }}
+          <Icon name="lucide:sparkles" class="size-4" />
+          Generate &amp; rate
         </button>
         <p v-if="vm.stylistLabel.value" class="text-center text-[0.7rem] tracking-wide text-taupe" data-testid="stylist-label">
           Styled by {{ vm.stylistLabel.value }} ·

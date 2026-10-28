@@ -1,11 +1,11 @@
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import { localIsoDate, longDayLabel } from '#shared/utils/date'
 import { resolveLookItems } from '#shared/utils/looks'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
-import { onViewMounted } from '../lifecycle'
+import { onViewMounted, onViewUnmounted } from '../lifecycle'
 
 export interface LookWithItems {
   look: StyleMatch
@@ -13,6 +13,13 @@ export interface LookWithItems {
 }
 
 const RECENT_LIMIT = 8
+
+/** Rough timings of a Claude daily pick; the endpoint doesn't stream, so the stages follow the clock. */
+const TODAY_STAGES: [afterSeconds: number, label: string][] = [
+  [12, 'Writing the verdict…'],
+  [4, "Choosing today's pieces…"],
+  [0, 'Reading your wardrobe…'],
+]
 
 export function useHomePage() {
   const wardrobe = useWardrobeStore()
@@ -26,6 +33,15 @@ export function useHomePage() {
   const error = computed(() => wardrobe.error ?? looks.error)
   const today = computed(() => (looks.todayLook ? withItems(looks.todayLook) : null))
   const todayLoading = computed(() => looks.todayLoading)
+  const waited = ref(0)
+  let ticker: ReturnType<typeof setInterval> | undefined
+  watch(todayLoading, (on) => {
+    clearInterval(ticker)
+    waited.value = 0
+    if (on) ticker = setInterval(() => waited.value++, 1000)
+  })
+  onViewUnmounted(() => clearInterval(ticker))
+  const todayStage = computed(() => TODAY_STAGES.find(([after]) => waited.value >= after)![1])
   const recent = computed(() => looks.recent(RECENT_LIMIT).map(withItems))
   const favourites = computed(() => looks.favourites.map(withItems))
 
@@ -41,5 +57,5 @@ export function useHomePage() {
 
   onViewMounted(init)
 
-  return { loading, error, today, todayLoading, recent, favourites, todayLabel: longDayLabel(now), init, toggleFavourite }
+  return { loading, error, today, todayLoading, todayStage, recent, favourites, todayLabel: longDayLabel(now), init, toggleFavourite }
 }

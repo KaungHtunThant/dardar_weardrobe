@@ -5,12 +5,14 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { SettingsUpdate, SettingsView } from '#shared/models/settings'
+import type { StyleCallOptions, StyleProgress } from '#shared/contracts/StyleAdvisor'
+import { createSseParser } from '#shared/utils/sse'
 
 /** Talks to the local Nitro API (same origin in the app; an explicit base URL in tests). */
 export class HttpWardrobeGateway implements WardrobeGateway {
   private readonly api: $Fetch
 
-  constructor(baseURL = '') {
+  constructor(private readonly baseURL = '') {
     this.api = ofetch.create({ baseURL })
   }
 
@@ -73,8 +75,33 @@ export class HttpWardrobeGateway implements WardrobeGateway {
     )
   }
 
-  generateLook(request: StyleRequestInput) {
-    return this.call(() => this.api<StyleMatch>('/api/looks/generate', { method: 'POST', body: request }))
+  /** Uses the streaming endpoint so progress shows and the stylist can be cancelled. */
+  async generateLook(request: StyleRequestInput, { signal, onProgress }: StyleCallOptions = {}): Promise<StyleMatch> {
+    const res = await fetch(`${this.baseURL}/api/looks/generate/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      body: JSON.stringify(request),
+      signal,
+    })
+    if (!res.ok || !res.body) throw new Error(`Styling failed (${res.status}).`)
+
+    let look: StyleMatch | null = null
+    let failure: string | null = null
+    const push = createSseParser((event, data) => {
+      if (event === 'progress') onProgress?.(data as StyleProgress)
+      else if (event === 'done') look = data as StyleMatch
+      else if (event === 'error') failure = (data as { message?: string }).message ?? 'Styling failed.'
+    })
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      push(decoder.decode(value, { stream: true }))
+    }
+    if (failure) throw new Error(failure)
+    if (!look) throw new Error('The stylist stopped before finishing.')
+    return look
   }
 
   getSettings() {

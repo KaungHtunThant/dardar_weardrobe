@@ -43,6 +43,7 @@ export function createApiRouter(c: Container) {
     .put('/api/looks/:id/favourite', handle((e) => looks.setFavourite(e)))
     .delete('/api/looks/:id', handle((e) => looks.delete(e)))
     .post('/api/looks/generate', handle((e) => looks.generate(e)))
+    .post('/api/looks/generate/stream', handle((e) => looks.generateStream(e)))
     .get('/api/settings', handle(() => settings.show()))
     .put('/api/settings', handle((e) => settings.update(e)))
     .post('/api/wardrobe/clear', handle((e) => wardrobe.clear(e)))

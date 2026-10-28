@@ -75,7 +75,7 @@ export function readStylePayload(message: string): StylePayload {
   return JSON.parse(message.slice(start + OPEN.length, end)) as StylePayload
 }
 
-const clean = (s: string, max: number) => s.trim().slice(0, max)
+export const clean = (s: string, max: number) => s.trim().slice(0, max)
 
 /** Shortens to the last full sentence that fits, so a long verdict never ends mid-word. */
 function sentences(s: string, max: number) {
@@ -91,14 +91,18 @@ const lines = (list: string[], max: number) => list.map((l) => clean(l, 300)).fi
  * Turns whatever the model returned into a suggestion that obeys the Studio rules,
  * so every provider satisfies the StyleAdvisor contract no matter what the model did.
  */
-export function toSuggestion(ai: AiSuggestion, request: StyleAdvisorRequest): StyleSuggestion {
+/**
+ * The user's picks plus the model's additions that obey the Studio rules: real pieces only, one per
+ * allowed category, never a dress over separates (or separates over a dress).
+ */
+export function pickLook(modelItemIds: readonly string[], request: StyleAdvisorRequest): { look: Item[]; added: Item[] } {
   const byId = new Map(request.wardrobe.map((i) => [i.id, i]))
   const look: Item[] = request.pinnedItemIds.flatMap((id) => byId.get(id) ?? [])
   const covered = new Set(look.map((i) => i.category))
   const allowed = new Set(request.fillCategories.filter((c) => !covered.has(c)))
   const added: Item[] = []
 
-  for (const id of ai.itemIds) {
+  for (const id of modelItemIds) {
     const item = byId.get(id)
     if (!item || look.includes(item) || !allowed.has(item.category)) continue
     const slots = new Set(look.map(slotFor))
@@ -109,6 +113,12 @@ export function toSuggestion(ai: AiSuggestion, request: StyleAdvisorRequest): St
     added.push(item)
     allowed.delete(item.category)
   }
+  return { look, added }
+}
+
+export function toSuggestion(ai: AiSuggestion, request: StyleAdvisorRequest): StyleSuggestion {
+  const byId = new Map(request.wardrobe.map((i) => [i.id, i]))
+  const { look, added } = pickLook(ai.itemIds, request)
 
   const inLook = new Set(look.map((i) => i.id))
   const fixes: StyleFix[] = []

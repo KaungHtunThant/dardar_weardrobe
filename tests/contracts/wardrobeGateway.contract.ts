@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { StyleProgress } from '#shared/contracts/StyleAdvisor'
 import type { WardrobeGateway } from '#shared/contracts/WardrobeGateway'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
@@ -136,6 +137,21 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       expect(look.rating?.score).toBeGreaterThanOrEqual(1)
       expect(look.prompt).toBe('weekend coffee')
       expect((await gw.listStyleMatches()).some((l) => l.id === look.id)).toBe(true)
+    })
+
+    it('reports progress while it styles, starting with reading the wardrobe', async () => {
+      const gw = await fresh()
+      const progress: StyleProgress[] = []
+      const look = await gw.generateLook({ pinnedItemIds: ['item-linen-tee'], fillCategories: ['shoes'] }, { onProgress: (p) => progress.push(p) })
+      expect(progress[0]).toEqual({ stage: 'reading', aiItemIds: [] })
+      for (const p of progress) expect(look.aiItemIds?.slice(0, p.aiItemIds.length)).toEqual(p.aiItemIds)
+    })
+
+    it('cancelling rejects with an AbortError and saves no look', async () => {
+      const gw = await fresh()
+      const before = (await gw.listStyleMatches()).length
+      await expect(gw.generateLook({ fillCategories: ['tops'] }, { signal: AbortSignal.abort() })).rejects.toMatchObject({ name: 'AbortError' })
+      expect(await gw.listStyleMatches()).toHaveLength(before)
     })
 
     it('reads stylist settings without ever exposing the API key', async () => {

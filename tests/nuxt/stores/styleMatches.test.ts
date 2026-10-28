@@ -50,6 +50,44 @@ describe('style matches store', () => {
     expect(store.byId(look!.id)?.rating).toBeDefined()
   })
 
+  it('exposes progress while styling and clears it afterwards', async () => {
+    const store = useStyleMatchesStore()
+    await store.load()
+    const seen: (string | undefined)[] = []
+    const real = gateway.generateLook.bind(gateway)
+    vi.spyOn(gateway, 'generateLook').mockImplementationOnce((request, options) =>
+      real(request, {
+        ...options,
+        onProgress: (p) => {
+          options?.onProgress?.(p)
+          seen.push(store.progress?.stage)
+        },
+      }),
+    )
+    await store.generate({ pinnedItemIds: ['item-linen-tee'], fillCategories: ['shoes'] })
+    expect(seen[0]).toBe('reading')
+    expect(seen.at(-1)).toBe('rating')
+    expect(store.progress).toBeNull()
+  })
+
+  it('cancelling stops the stylist quietly: no look, no error', async () => {
+    let signal: AbortSignal | undefined
+    vi.spyOn(gateway, 'generateLook').mockImplementationOnce((_request, options) => {
+      signal = options?.signal
+      return new Promise((_resolve, reject) => options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason)))
+    })
+    const store = useStyleMatchesStore()
+    await store.load()
+    const before = store.looks.length
+    const pending = store.generate({ fillCategories: ['tops'] })
+    store.cancelGenerate()
+    expect(await pending).toBeNull()
+    expect(signal!.aborted).toBe(true)
+    expect(store.generateError).toBeNull()
+    expect(store.generating).toBe(false)
+    expect(store.looks).toHaveLength(before)
+  })
+
   it('records a generation error and returns null', async () => {
     vi.spyOn(gateway, 'generateLook').mockRejectedValueOnce(new Error('advisor down'))
     const store = useStyleMatchesStore()

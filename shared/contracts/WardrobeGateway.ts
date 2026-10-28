@@ -3,6 +3,7 @@ import type { Item, ItemDetailsInput } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
 import type { StyleRequestInput } from '../models/styleRequest'
 import type { SettingsUpdate, SettingsView } from '../models/settings'
+import type { StyleCallOptions } from './StyleAdvisor'
 
 /** Result of preparing an uploaded photo: the original and the garment-only version. */
 export interface ProcessedPhoto {
@@ -39,8 +40,11 @@ export interface StyleMatchGateway {
 }
 
 export interface StylingGateway {
-  /** Completes the user's picks with AI choices, rates the look and saves it as a style match. */
-  generateLook(request: StyleRequestInput): Promise<StyleMatch>
+  /**
+   * Completes the user's picks with AI choices, rates the look and saves it as a style match.
+   * `onProgress` reports the look as it takes shape; aborting `signal` cancels it and nothing is saved.
+   */
+  generateLook(request: StyleRequestInput, options?: StyleCallOptions): Promise<StyleMatch>
 }
 
 export interface SettingsGateway {

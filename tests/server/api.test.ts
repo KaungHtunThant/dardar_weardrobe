@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ofetch } from 'ofetch'
+import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
+import { createSseParser } from '#shared/utils/sse'
 import { startApi } from './harness'
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
@@ -99,5 +101,52 @@ describe('API', () => {
     await ofetch(`${api.baseURL}/api/items/${item.id}/photo`, { method: 'PUT', body: second })
     expect((await fetch(`${api.baseURL}${first.cleanImage}`)).status).toBe(404)
     expect((await fetch(`${api.baseURL}${second.cleanImage}`)).status).toBe(200)
+  })
+})
+
+describe('POST /api/looks/generate/stream', () => {
+  const post = (body: unknown, signal?: AbortSignal) =>
+    fetch(`${api.baseURL}/api/looks/generate/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal })
+
+  function events(text: string) {
+    const out: { event: string; data: unknown }[] = []
+    const push = createSseParser((event, data) => out.push({ event, data }))
+    push(text)
+    return out
+  }
+
+  it('streams progress, then the saved look', async () => {
+    api = await startApi(seed())
+    const res = await post({ pinnedItemIds: ['item-linen-tee'], fillCategories: ['shoes'] })
+    expect(res.headers.get('content-type')).toMatch(/text\/event-stream/)
+    const all = events(await res.text())
+    expect(all[0]).toEqual({ event: 'progress', data: { stage: 'reading', aiItemIds: [] } })
+    const done = all.at(-1)!
+    expect(done.event).toBe('done')
+    expect(await ofetch(`${api.baseURL}/api/looks`)).toContainEqual(done.data)
+  })
+
+  it('sends a bad request as an error event', async () => {
+    api = await startApi(seed())
+    const all = events(await (await post({ pinnedItemIds: ['item-ghost'] })).text())
+    expect(all.at(-1)).toMatchObject({ event: 'error', data: { statusCode: 400, message: expect.stringMatching(/item-ghost/) } })
+  })
+
+  it('cancelling the request stops the stylist and saves nothing', async () => {
+    let seen: AbortSignal | undefined
+    const hanging: StyleAdvisor = {
+      suggestLook: (_request, options) =>
+        new Promise((_resolve, reject) => {
+          seen = options?.signal
+          options?.signal?.addEventListener('abort', () => reject(options.signal!.reason))
+        }),
+    }
+    api = await startApi(seed(), { advisors: { offline: () => hanging, cli: () => hanging, api: () => hanging } })
+    const controller = new AbortController()
+    const res = await post({ fillCategories: ['tops'] }, controller.signal)
+    await res.body!.getReader().read() // the "reading" progress has arrived
+    controller.abort()
+    await vi.waitFor(() => expect(seen?.aborted).toBe(true))
+    expect(await ofetch(`${api.baseURL}/api/looks`)).toHaveLength(seedStyleMatches.length)
   })
 })

@@ -1,4 +1,4 @@
-import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
+import type { StyleAdvisor, StyleCallOptions } from '#shared/contracts/StyleAdvisor'
 import type { CreateItemInput, ProcessedPhoto, WardrobeGateway } from '#shared/contracts/WardrobeGateway'
 import { ItemDetailsSchema, type Item, type ItemDetailsInput } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
@@ -153,14 +153,28 @@ export class MockWardrobeGateway implements WardrobeGateway {
     return structuredClone((await this.data()).styleMatches)
   }
 
-  async generateLook(input: StyleRequestInput): Promise<StyleMatch> {
+  /** Prototype: styles instantly, then replays the AI's picks and verdict as progress, as a real stylist streams them. */
+  async generateLook(input: StyleRequestInput, { signal, onProgress }: StyleCallOptions = {}): Promise<StyleMatch> {
     const request = StyleRequestSchema.parse(input)
+    signal?.throwIfAborted()
+    onProgress?.({ stage: 'reading', aiItemIds: [] })
     const data = await this.data()
-    const suggestion = await this.advisor.suggestLook({ wardrobe: data.items, ...request })
+    const suggestion = await this.advisor.suggestLook({ wardrobe: data.items, ...request }, { signal })
+    const step = async () => {
+      await this.wait()
+      signal?.throwIfAborted()
+    }
+    await step()
+    const { title, aiItemIds } = suggestion
+    for (let n = 1; n <= aiItemIds.length; n++) {
+      onProgress?.({ stage: 'picking', title, aiItemIds: aiItemIds.slice(0, n) })
+      await step()
+    }
+    onProgress?.({ stage: 'rating', title, aiItemIds, verdict: suggestion.rating.verdict })
+    await step()
     const look = lookFromSuggestion(suggestion, request, `look-${this.newId()}`, this.now())
     data.styleMatches.push(look)
     await this.persist()
-    await this.wait(6)
     return structuredClone(look)
   }
 

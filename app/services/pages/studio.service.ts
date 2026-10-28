@@ -70,16 +70,29 @@ export function useStudioPage() {
   const panelTab = ref<PanelTab>('wardrobe')
   const resultId = ref<string | null>(null)
   const stale = ref(false)
+  /** The pieces the running generation started from (null when idle). */
+  const pending = ref<string[] | null>(null)
 
   const byId = (id?: string) => (id ? wardrobe.items.find((i) => i.id === id) : undefined)
 
+  const busy = computed(() => looks.generating)
+  const progress = computed(() => (busy.value ? looks.progress : null))
+  const streamedAi = computed(() => progress.value?.aiItemIds ?? [])
+
   const outfit = computed(() => outfitIds.value.flatMap((id) => byId(id) ?? []))
+  /** What the form shows: the outfit, or while styling, the starting pieces plus the AI's picks so far. */
+  const shown = computed(() => {
+    if (!pending.value) return outfit.value
+    const ids = [...pending.value, ...streamedAi.value.filter((id) => !pending.value!.includes(id))]
+    return ids.flatMap((id) => byId(id) ?? [])
+  })
   const placed = computed<PlacedPiece[]>(() =>
-    outfit.value.map((item) => ({ item, slot: slotFor(item), isAi: aiIds.value.includes(item.id) })),
+    shown.value.map((item) => ({ item, slot: slotFor(item), isAi: aiIds.value.includes(item.id) || streamedAi.value.includes(item.id) })),
   )
   const covered = computed(() => new Set(outfit.value.map((i) => i.category)))
-  const wearsDress = computed(() => covered.value.has('dresses'))
-  const wearsSeparates = computed(() => covered.value.has('tops') || covered.value.has('bottoms'))
+  const shownCovered = computed(() => new Set(shown.value.map((i) => i.category)))
+  const wearsDress = computed(() => shownCovered.value.has('dresses'))
+  const wearsSeparates = computed(() => shownCovered.value.has('tops') || shownCovered.value.has('bottoms'))
 
   const fillOptions = computed<FillOption[]>(() =>
     CATEGORIES.map((c) => ({ id: c.id, label: c.label, on: fill.value.includes(c.id), coveredByYou: covered.value.has(c.id) })),
@@ -89,6 +102,7 @@ export function useStudioPage() {
     const open = openToAi.value
     return open
       .filter((id) => {
+        if (shownCovered.value.has(id)) return false
         if ((id === 'tops' || id === 'bottoms') && wearsDress.value) return false
         // The AI prefers separates when both are allowed, so don't draw a dress over them.
         if (id === 'dresses') return !wearsSeparates.value && !open.includes('tops') && !open.includes('bottoms')
@@ -100,7 +114,6 @@ export function useStudioPage() {
   const panelItems = computed(() => wardrobe.byCategory(panelCategory.value))
   const wornIds = computed(() => outfitIds.value)
   const wornCategories = computed(() => [...covered.value])
-  const busy = computed(() => looks.generating)
   const canGenerate = computed(() => !busy.value && (outfitIds.value.length > 0 || openToAi.value.length > 0))
 
   const result = computed(() => (resultId.value ? looks.byId(resultId.value) : null))
@@ -122,6 +135,18 @@ export function useStudioPage() {
     }
   })
   const loading = computed(() => !wardrobe.loaded && !wardrobe.error)
+  const progressLabel = computed(() => {
+    switch (progress.value?.stage) {
+      case 'picking':
+        return 'Choosing pieces…'
+      case 'rating':
+        return 'Writing the verdict…'
+      default:
+        return 'Reading your wardrobe…'
+    }
+  })
+  const liveTitle = computed(() => progress.value?.title ?? '')
+  const liveVerdict = computed(() => progress.value?.verdict ?? '')
 
   function isWorn(id: string) {
     return outfitIds.value.includes(id)
@@ -160,7 +185,13 @@ export function useStudioPage() {
 
   async function run(pinned: string[], fillCategories: CategoryId[]) {
     const previousAi = aiIds.value
-    const look = await looks.generate({ pinnedItemIds: pinned, fillCategories, prompt: prompt.value })
+    pending.value = pinned
+    let look
+    try {
+      look = await looks.generate({ pinnedItemIds: pinned, fillCategories, prompt: prompt.value })
+    } finally {
+      pending.value = null
+    }
     if (!look) return
     outfitIds.value = look.itemIds
     aiIds.value = [...new Set([...previousAi.filter((id) => look.itemIds.includes(id)), ...(look.aiItemIds ?? [])])]
@@ -178,6 +209,11 @@ export function useStudioPage() {
     const next = outfitIds.value.filter((id) => id !== fix.removeItemId)
     if (fix.addItemId && !next.includes(fix.addItemId)) next.push(fix.addItemId)
     return run(next, [])
+  }
+
+  /** Stops the stylist; the form goes back to how it was and nothing is saved. */
+  function cancel() {
+    looks.cancelGenerate()
   }
 
   function toggleFavourite() {
@@ -224,6 +260,10 @@ export function useStudioPage() {
     panelTab,
     canGenerate,
     busy,
+    progress,
+    progressLabel,
+    liveTitle,
+    liveVerdict,
     result,
     stale,
     scoreLabel,
@@ -239,6 +279,7 @@ export function useStudioPage() {
     setPanelTab,
     toggleFill,
     generate,
+    cancel,
     applyFix,
     toggleFavourite,
     clearOutfit,

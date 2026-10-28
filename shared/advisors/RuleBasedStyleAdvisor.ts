@@ -1,4 +1,4 @@
-import type { StyleAdvisor, StyleAdvisorRequest, StyleSuggestion } from '../contracts/StyleAdvisor'
+import type { StyleAdvisor, StyleAdvisorRequest, StyleCallOptions, StyleSuggestion } from '../contracts/StyleAdvisor'
 import type { CategoryId } from '../models/category'
 import { OCCASIONS, SEASONS, type Item, type Occasion, type Season } from '../models/item'
 import type { StyleFix, StyleRating } from '../models/styleMatch'
@@ -109,7 +109,8 @@ function bestPick(pool: readonly Item[], look: readonly Item[], ctx: Context): I
 }
 
 export class RuleBasedStyleAdvisor implements StyleAdvisor {
-  async suggestLook(request: StyleAdvisorRequest): Promise<StyleSuggestion> {
+  async suggestLook(request: StyleAdvisorRequest, options: StyleCallOptions = {}): Promise<StyleSuggestion> {
+    options.signal?.throwIfAborted()
     const { wardrobe, prompt } = request
     const byId = new Map(wardrobe.map((i) => [i.id, i]))
     const pinned = request.pinnedItemIds.map((id) => {

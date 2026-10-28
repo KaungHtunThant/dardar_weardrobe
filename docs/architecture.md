@@ -40,6 +40,7 @@ tests/                  unit/, nuxt/, contracts/, e2e/
   - `ImageProcessor` is the imgly background remover.
   - `SettingsService` resolves the advisor and tagger per request from the user's choice. Concrete classes are wired in `server/container.ts`.
   - All advisors pass `tests/contracts/styleAdvisor.contract.ts`. Model output always goes through `toSuggestion()` / `toDetailsSuggestion()`, so a model can never break the Studio rules or the data.
+  - **Streaming and cancel:** `suggestLook` and `generateLook` take `{ signal, onProgress }`. Partial model output goes through `parsePartialJson()` and `styleProgressReporter()`, so progress, too, only names pieces the Studio rules allow. The Studio uses `POST /api/looks/generate/stream` (server-sent events); closing the connection aborts the stylist, and nothing is saved.
 
 ## Views are markup only
 

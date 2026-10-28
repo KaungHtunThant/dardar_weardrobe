@@ -30,6 +30,7 @@ const vm = useHomePage()
         <div>
           <Icon name="lucide:sparkles" class="mx-auto size-6 animate-pulse text-rose" />
           <p class="mt-3 font-display text-2xl text-ink">Your stylist is putting today's look together…</p>
+          <p role="status" class="mt-2 text-sm text-taupe" data-testid="today-stage">{{ vm.todayStage.value }}</p>
         </div>
       </div>
       <UiEmptyState
