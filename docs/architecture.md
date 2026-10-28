@@ -35,10 +35,12 @@ tests/                  unit/, nuxt/, contracts/, e2e/
 - `app/gateways/provider.ts` is the only link between stores and the gateway: `provideGateway()` / `useGateway()`.
 - `app/gateways/createGateway.ts` is the only file that creates a concrete gateway. It picks one from `runtimeConfig.public.gateway`.
 - **AI sits behind contracts.**
+  - **`StylistAgent`:** every Claude call runs as Dardar. `LocalStylistAgent` writes a Claude CLI agents file on first launch (`claude --agents <file> --agent dardar-stylist`); the API uses the same persona as its cached system prompt.
   - `StyleAdvisor` has three implementations: `RuleBasedStyleAdvisor` (offline), `ClaudeCliStyleAdvisor` and `ClaudeApiStyleAdvisor`.
-  - `GarmentTagger` has the CLI and API taggers.
-  - `ImageProcessor` is the imgly background remover.
-  - `SettingsService` resolves the advisor and tagger per request from the user's choice. Concrete classes are wired in `server/container.ts`.
+  - `GarmentAnalyst` (CLI, API, offline) finds the garment in an upload: box, worn or not, details. `GarmentTagger` (CLI and API) still backs `/api/items/suggest`.
+  - `ImageProcessor` is the garment studio (`GarmentStudioProcessor`): crop to the box → imgly matte (in a worker thread, `WorkerImglyImageProcessor`) → `ClothesSegmenter` for worn garments → finish on the 800×960 canvas. Tests use `PassThroughImageProcessor`.
+  - `GarmentPipeline` (analyse → cut out) serves both the upload queue (`UploadService`, one photo at a time, stored in SQLite) and replace-photo.
+  - `SettingsService` resolves the advisor, tagger and analyst per request from the user's choice. Concrete classes are wired in `server/container.ts`.
   - All advisors pass `tests/contracts/styleAdvisor.contract.ts`. Model output always goes through `toSuggestion()` / `toDetailsSuggestion()`, so a model can never break the Studio rules or the data.
   - **Streaming and cancel:** `suggestLook` and `generateLook` take `{ signal, onProgress }`. Partial model output goes through `parsePartialJson()` and `styleProgressReporter()`, so progress, too, only names pieces the Studio rules allow. The Studio uses `POST /api/looks/generate/stream` (server-sent events); closing the connection aborts the stylist, and nothing is saved.
 
@@ -116,3 +118,5 @@ TDD order for each feature:
 - **E2E fixtures call `POST /api/dev/reset` before each test,** so every test starts from the seed data. The e2e server runs with `NUXT_ALLOW_RESET=true` and a throwaway `.data-e2e`; a dev server on :3123 started without that flag makes the fixture fail loudly.
 - **Server code imports from `h3` explicitly** (not Nitro auto-imports), so the unit tests can run it outside Nitro. Only `server/api/[...].ts` uses Nitro globals.
 - **When stopping test servers,** use `pkill -f "[n]uxt dev --port 3123"`. A plain pattern also matches the shell running the command and kills it.
+- **Heavy local models never run on the server's event loop.** imgly blocks for seconds per photo, so it runs in a worker thread; otherwise every API call (including the upload tray's polls) stalls while the queue works.
+- **`sharp` 0.32 must be loaded by the main thread before any worker thread loads it.** `nuxt.config.ts` imports it for `nuxt dev`, whose API runs in a worker.

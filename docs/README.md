@@ -2,8 +2,8 @@
 
 Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It runs as an Electron + Nuxt 4 desktop app, for a single user, with data kept locally.
 
-- **Add clothes:** the user uploads a photo. The background is removed and the clean image is saved with the details the user enters.
-- **Get looks:** Claude style-matches the user's existing clothes into looks, with or without a custom prompt. It runs through the Claude Code CLI or the Anthropic API, whichever the user prefers.
+- **Add clothes:** the user adds photos (several at once) and carries on. In the background, the stylist finds the garment and Dardar cuts exactly that out (no person, hanger or background), centred like the sample images. The user then reviews the suggested details and saves.
+- **Get looks:** Claude style-matches the user's existing clothes into looks, with or without a custom prompt. Every Claude call runs as **Dardar**, the stylist agent set up on first launch, through the Claude Code CLI or the Anthropic API, whichever the user prefers.
 
 ## Documents
 
@@ -17,6 +17,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | [phases/phase-3-backend.md](phases/phase-3-backend.md) | Nitro controllers, SQLite (`node:sqlite`) persistence, image storage, HTTP gateway |
 | [phases/phase-5.md](phases/phase-5.md) | Managing pieces (edit/delete), Looks library, faster-feeling AI, installer |
 | [phases/phase-4-ai.md](phases/phase-4-ai.md) | Local background removal; Claude (CLI or API) or Offline styling and brutal ratings; settings; daily pick; add-item pre-fill |
+| [phases/phase-6.md](phases/phase-6.md) | Dardar the stylist agent (first launch); the garment studio (cut out exactly the garment, digitalized); the upload queue and tray |
 
 ## Phase status
 
@@ -28,6 +29,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | 3: Backend | Done | `8c238ef` |
 | 4: AI | Done | `4072a35`, `e8f0760`, `879c622` |
 | 5: Manage, library, streaming, installer | Done | `60d0b16`, `5de3875`, `31a6317`, `4bf1da1` (+ CI fixes) |
+| 6: Stylist agent, garment studio, upload queue | Done | `7e5a538`, `f834a7e`, `73ffa3d`, `1f60d13` |
 
 ## Running the app
 
@@ -51,16 +53,17 @@ npm run test:smoke   # Playwright against the unpacked build, with a brand-new p
 ```
 
 - Each platform builds its own installer, because the server's native modules (ONNX runtime, sharp) must match it. The **Release builds** GitHub Actions workflow (Actions tab → Run workflow) builds and smoke-tests the Windows `.exe` and the Linux AppImage and attaches them to the run.
-- `npm run build` makes `.output` self-contained: `scripts/bundle-server-assets.mjs` adds the background-removal model and keeps only this platform's CPU ONNX runtime (516 MB → 129 MB).
+- `npm run build` makes `.output` self-contained: `scripts/fetch-models.mjs` fetches the clothes-segmentation model (sha256-checked), and `scripts/bundle-server-assets.mjs` adds it and the background-removal model and keeps only this platform's CPU ONNX runtime.
 - electron-builder (`electron-builder.yml`) ships `.output` as `resources/app-server`, outside the asar archive.
 - The icon is drawn by `npm run icon` (`build/icon.png`).
 - **Known limits:** the builds are unsigned, so Windows SmartScreen and macOS Gatekeeper will warn. There is no macOS build yet. The first background removal after a start loads the model, which takes a few seconds. Linux needs a system keychain (GNOME Keyring or KWallet) to save an API key; without one, set `ANTHROPIC_API_KEY` instead.
+- **Licence:** the clothes-segmentation weights (SegFormer B2 clothes) are under NVIDIA's SegFormer licence, **non-commercial use only**. The app must not be sold with them; swapping the model means one new `ClothesSegmenter` class.
 
 Data: the dev server keeps its SQLite database and images in `.data/` and seeds demo clothes into an empty database (`NUXT_DEMO_SEED=false` to start empty). The packaged app stores data in Electron's `userData` folder and starts empty.
 
-AI: on first run the stylist is the Claude Code CLI if it's installed (it uses your Claude login), otherwise the Anthropic API if `ANTHROPIC_API_KEY` is set, otherwise the Offline rules. Change it under **Settings**.
+AI: on first launch the app sets up **Dardar**, the stylist agent (`<data>/agent/agents.json`, a Claude CLI agents file), and saves the stylist it picked: the Claude Code CLI if it's installed (it uses your Claude login), otherwise the Anthropic API if `ANTHROPIC_API_KEY` is set, otherwise the Offline rules. Change it under **Settings**, where Dardar can also be set up again.
 
-Opt-in tests: `RUN_SLOW=1 npm test` runs the real background-removal model; `RUN_LIVE=1 npm test` makes real Claude calls (CLI, plus the API when `ANTHROPIC_API_KEY` is set).
+Opt-in tests: `RUN_SLOW=1 npm test` runs the real background-removal and clothes-segmentation models (outputs in `test-results/studio/`); `RUN_LIVE=1 npm test` makes real Claude calls (CLI, plus the API when `ANTHROPIC_API_KEY` is set).
 
 Requirements:
 - Node 22 or later.
