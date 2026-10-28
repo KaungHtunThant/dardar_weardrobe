@@ -16,3 +16,12 @@ logs
 test-results
 playwright-report
 coverage
+
+# AI assistant / MCP files (kept local)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
+.serena/
+.codebase-memory/
+.jcodemunch/
