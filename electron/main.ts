@@ -6,6 +6,8 @@ import { serverEntry } from './paths'
 import { createSecretHandler, type SecretRequest } from './secrets'
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production'
+// A separate data folder (tests use it for a brand-new profile; it also makes a portable setup possible).
+if (process.env.DARDAR_USER_DATA) app.setPath('userData', process.env.DARDAR_USER_DATA)
 const DEV_URL = process.env.DARDAR_URL ?? 'http://localhost:3000'
 
 function freePort(): Promise<number> {

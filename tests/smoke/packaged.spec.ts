@@ -9,13 +9,13 @@ const executable =
 
 const photo = { name: 'blouse.png', mimeType: 'image/png', buffer: readFileSync('tests/fixtures/photos/blouse-on-blue.png') }
 
-/** A brand-new user profile, so the app starts as a fresh install would. */
+/** A brand-new data folder, so the app starts as a fresh install would. */
 const home = mkdtempSync(join(tmpdir(), 'dardar-smoke-'))
 
 function launch(): Promise<ElectronApplication> {
   return electron.launch({
     executablePath: executable,
-    env: { ...process.env, HOME: home, USERPROFILE: home, APPDATA: join(home, 'AppData', 'Roaming'), XDG_CONFIG_HOME: join(home, '.config'), ANTHROPIC_API_KEY: '' },
+    env: { ...process.env, DARDAR_USER_DATA: home, ANTHROPIC_API_KEY: '' },
   })
 }
 
@@ -26,6 +26,7 @@ test('a fresh install starts empty, removes a real background, styles offline an
   let app = await launch()
   let page = await app.firstWindow()
   const userData = await app.evaluate(({ app }) => app.getPath('userData'))
+  expect(userData).toBe(home)
   const nav = () => page.getByRole('navigation', { name: 'Main' })
 
   // Empty wardrobe, no demo data.
