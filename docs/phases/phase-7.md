@@ -1,6 +1,6 @@
 # Phase 7: The user's city and the weather
 
-**Status:** Done
+**Status:** Done (commit `dfd4d6d`)
 
 The user asked for three things:
 - on initial setup, add the user's current location for better fashion advice;
