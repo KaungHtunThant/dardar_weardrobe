@@ -4,6 +4,7 @@ import type { CategoryId } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
 import type { StyleFix } from '#shared/models/styleMatch'
 import { slotFor } from '#shared/utils/outfit'
+import { weatherBrief } from '#shared/utils/weather'
 
 /** What the model returns (structured output). Nullables instead of optionals, as structured outputs require. */
 export const AiSuggestionSchema = z.object({
@@ -25,6 +26,8 @@ export interface StylePayload {
   pinnedItemIds: string[]
   mayAddFrom: CategoryId[]
   brief: string | null
+  /** Today's forecast where the client lives, if known. */
+  weather: { place: string; forecast: string } | null
 }
 
 const OPEN = '<wardrobe_request>'
@@ -40,6 +43,7 @@ function payloadFor(request: StyleAdvisorRequest): StylePayload {
     pinnedItemIds: [...request.pinnedItemIds],
     mayAddFrom: request.fillCategories.filter((c) => !covered.has(c)),
     brief: request.prompt?.trim() || null,
+    weather: request.weather ? { place: request.weather.place, forecast: weatherBrief(request.weather) } : null,
   }
 }
 
@@ -50,7 +54,8 @@ export function buildStyleMessage(request: StyleAdvisorRequest): string {
     ? `Complete the look by adding at most one piece from each of: ${payload.mayAddFrom.join(', ')}. Then rate the finished look.`
     : 'Do not add anything. Rate the look exactly as picked.'
   const brief = payload.brief ? `The client's brief: "${payload.brief}".` : 'No brief: choose the strongest direction for these pieces.'
-  return `Task: style a look.\n${task}\n${brief}\n\n${OPEN}\n${JSON.stringify(payload)}\n${CLOSE}`
+  const weather = payload.weather ? `\nDress for today's weather in ${payload.weather.place}: ${payload.weather.forecast}.` : ''
+  return `Task: style a look.\n${task}\n${brief}${weather}\n\n${OPEN}\n${JSON.stringify(payload)}\n${CLOSE}`
 }
 
 export function readStylePayload(message: string): StylePayload {

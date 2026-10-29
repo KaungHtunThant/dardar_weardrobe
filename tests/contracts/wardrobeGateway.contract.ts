@@ -6,6 +6,8 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import { ItemDetailsSchema, ItemSchema } from '#shared/models/item'
 import { StyleMatchSchema } from '#shared/models/styleMatch'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
+import { DayWeatherSchema, PlaceSchema } from '#shared/models/weather'
+import { localIsoDate } from '#shared/utils/date'
 
 export interface GatewaySeed {
   items: Item[]
@@ -226,6 +228,45 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       expect(await gw.listStyleMatches()).toEqual([])
       expect(await gw.getTodayLook('2026-10-28')).toBeNull()
       expect((await gw.getSettings()).model).toBe('claude-haiku-5-5')
+    })
+
+    it('changes only the settings an update names', async () => {
+      const gw = await fresh()
+      await gw.updateSettings({ advisor: 'offline', model: 'claude-haiku-5-5', effort: 'high' })
+      expect(await gw.updateSettings({ welcomed: true })).toMatchObject({ model: 'claude-haiku-5-5', effort: 'high' })
+    })
+
+    it('finds cities and suggests where the user is', async () => {
+      const gw = await fresh()
+      const found = await gw.searchPlaces('London')
+      expect(found[0]).toMatchObject({ name: 'London' })
+      for (const p of found) expect(() => PlaceSchema.parse(p)).not.toThrow()
+      expect(await gw.searchPlaces(' ')).toEqual([])
+      const here = await gw.locatePlace()
+      if (here) expect(() => PlaceSchema.parse(here)).not.toThrow()
+    })
+
+    it('keeps the city in the settings and has its weather; no city, no weather', async () => {
+      const gw = await fresh()
+      const today = localIsoDate(new Date())
+      expect((await gw.getSettings()).location).toBeNull()
+      expect(await gw.getWeather(today)).toBeNull()
+      const [london] = await gw.searchPlaces('London')
+      expect((await gw.updateSettings({ location: london })).location).toMatchObject({ name: 'London' })
+      const weather = await gw.getWeather(today)
+      expect(() => DayWeatherSchema.parse(weather)).not.toThrow()
+      expect(weather).toMatchObject({ date: today, place: expect.stringContaining('London') })
+      expect((await gw.updateSettings({ location: null })).location).toBeNull()
+    })
+
+    it("styles a look for today's weather, unless asked not to", async () => {
+      const gw = await fresh()
+      const [london] = await gw.searchPlaces('London')
+      await gw.updateSettings({ location: london })
+      const dressed = await gw.generateLook({ fillCategories: ['tops', 'bottoms'] })
+      expect(dressed.weather?.place).toContain('London')
+      expect((await gw.listStyleMatches()).find((l) => l.id === dressed.id)?.weather).toEqual(dressed.weather)
+      expect((await gw.generateLook({ fillCategories: ['tops'], dressForWeather: false })).weather).toBeUndefined()
     })
 
     it('rejects invalid settings', async () => {

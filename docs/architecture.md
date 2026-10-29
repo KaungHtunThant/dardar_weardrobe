@@ -5,7 +5,7 @@
 ```
 shared/                 MODEL: framework-free domain code, imported by app/ and (later) server/
   models/               zod schemas + inferred types (Category, Item, StyleMatch)
-  contracts/            interfaces (WardrobeGateway, repositories, ImageStore, ImageProcessor, StyleAdvisor)
+  contracts/            interfaces (WardrobeGateway, repositories, ImageStore, ImageProcessor, StyleAdvisor, WeatherProvider, PlaceFinder)
   utils/                pure functions (filtering, counting, sorting, today's pick, dates)
   fixtures/seed.ts      prototype data
 
@@ -42,6 +42,7 @@ tests/                  unit/, nuxt/, contracts/, e2e/
   - `GarmentPipeline` (analyse → cut out) serves both the upload queue (`UploadService`, one photo at a time, stored in SQLite) and replace-photo.
   - `SettingsService` resolves the advisor, tagger and analyst per request from the user's choice. Concrete classes are wired in `server/container.ts`.
   - All advisors pass `tests/contracts/styleAdvisor.contract.ts`. Model output always goes through `toSuggestion()` / `toDetailsSuggestion()`, so a model can never break the Studio rules or the data.
+  - **Weather (Phase 7):** `WeatherProvider` (`OpenMeteoWeather`, wrapped in `CachedWeatherProvider`), `PlaceDirectory` (`OpenMeteoPlaceDirectory`) and `PlaceLocator` (`GeoJsPlaceLocator`, an IP guess). The offline stand-ins in `shared/weather/DemoWeather.ts` serve the mock gateway, tests and e2e (`NUXT_WEATHER=demo`). All pass `tests/contracts/weather.contract.ts`. `WeatherService` reads the city from the settings and never lets a weather failure stop styling. `TodayService` and `StylingService` pass the day's forecast to the advisor (`StyleAdvisorRequest.weather`), and the look keeps it (`StyleMatch.weather`).
   - **Streaming and cancel:** `suggestLook` and `generateLook` take `{ signal, onProgress }`. Partial model output goes through `parsePartialJson()` and `styleProgressReporter()`, so progress, too, only names pieces the Studio rules allow. The Studio uses `POST /api/looks/generate/stream` (server-sent events); closing the connection aborts the stylist, and nothing is saved.
 
 ## Views are markup only

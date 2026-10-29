@@ -4,6 +4,7 @@ import type { Occasion, Season } from '#shared/models/item'
 import type { StyleRating } from '#shared/models/styleMatch'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { UploadStage, UploadState } from '#shared/models/upload'
+import type { DayWeather } from '#shared/models/weather'
 
 export const items = sqliteTable('items', {
   id: text('id').primaryKey(),
@@ -31,6 +32,7 @@ export const styleMatches = sqliteTable('style_matches', {
   rating: text('rating', { mode: 'json' }).$type<StyleRating>(),
   isFavourite: integer('is_favourite', { mode: 'boolean' }).notNull(),
   dailyPickDate: text('daily_pick_date'),
+  weather: text('weather', { mode: 'json' }).$type<DayWeather>(),
   createdAt: text('created_at').notNull(),
 })
 

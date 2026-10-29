@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsPage } from '~/services/pages/settings.service'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
+import { DEMO_PLACES } from '#shared/weather/DemoWeather'
 import { setupTestGateway } from '../../helpers'
 
 async function ready() {
@@ -32,6 +33,28 @@ describe('settings page service', () => {
     await vm.recreateAgent()
     expect(spy).toHaveBeenCalled()
     expect(vm.savedMessage.value).toMatch(/Dardar is set up again/)
+  })
+
+  it('shows the city looks are dressed for, and changes it at once', async () => {
+    const vm = await ready()
+    expect(vm.location.value).toBeNull()
+    vm.changeLocation()
+    expect(vm.editingLocation.value).toBe(true)
+    await vm.pickLocation(DEMO_PLACES.find((p) => p.name === 'Milan')!)
+    expect(vm.location.value).toEqual({ label: 'Milan, Italy', detail: 'Lombardy' })
+    expect(vm.editingLocation.value).toBe(false)
+    expect(vm.savedMessage.value).toMatch(/Milan/)
+    expect((await gateway.getSettings()).location).toMatchObject({ name: 'Milan' })
+    expect(vm.dirty.value).toBe(false)
+  })
+
+  it('forgets the city on request', async () => {
+    await gateway.updateSettings({ location: DEMO_PLACES[0] })
+    const vm = await ready()
+    expect(vm.location.value?.label).toBe('Paris, France')
+    await vm.removeLocation()
+    expect(vm.location.value).toBeNull()
+    expect((await gateway.getSettings()).location).toBeNull()
   })
 
   it('warns before saving a mode that cannot work yet', async () => {

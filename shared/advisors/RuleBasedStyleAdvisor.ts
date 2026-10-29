@@ -2,7 +2,9 @@ import type { StyleAdvisor, StyleAdvisorRequest, StyleCallOptions, StyleSuggesti
 import type { CategoryId } from '../models/category'
 import { OCCASIONS, SEASONS, type Item, type Occasion, type Season } from '../models/item'
 import type { StyleFix, StyleRating } from '../models/styleMatch'
+import type { DayWeather } from '../models/weather'
 import { ValidationError } from '../errors'
+import { feelOf, isWet, seasonsForWeather } from '../utils/weather'
 
 /**
  * The "Offline" advisor: deterministic, rule-based styling and a deliberately blunt rating.
@@ -66,9 +68,11 @@ const names = (items: readonly Item[]) => {
 interface Context {
   occasions: Occasion[]
   seasons: Season[]
+  /** With a forecast, pieces for another season are a real mistake, not just a missed bonus. */
+  weatherSeasons: Season[]
 }
 
-function promptContext(prompt = ''): Context {
+function promptContext(prompt = ''): Omit<Context, 'weatherSeasons'> {
   const text = prompt.toLowerCase()
   return {
     occasions: PROMPT_OCCASIONS.filter(([re]) => re.test(text)).map(([, o]) => o),
@@ -96,6 +100,7 @@ function scoreCandidate(candidate: Item, look: readonly Item[], ctx: Context): n
   let score = 0
   score += 3 * candidate.occasions.filter((o) => ctx.occasions.includes(o)).length
   score += 2 * candidate.seasons.filter((s) => ctx.seasons.includes(s)).length
+  if (ctx.weatherSeasons.length && candidate.seasons.length && !candidate.seasons.some((s) => ctx.weatherSeasons.includes(s))) score -= 4
   const palette = statementColours(look)
   const own = candidate.colors.map((c) => c.toLowerCase()).filter((c) => !isNeutral(c))
   if (own.length === 0) score += 2
@@ -121,9 +126,11 @@ export class RuleBasedStyleAdvisor implements StyleAdvisor {
 
     const fromPrompt = promptContext(prompt)
     const pinnedOccasion = dominantOccasion(pinned)
+    const weatherSeasons = request.weather ? seasonsForWeather(request.weather) : []
     const ctx: Context = {
       occasions: fromPrompt.occasions.length ? fromPrompt.occasions : pinnedOccasion ? [pinnedOccasion] : ['casual'],
-      seasons: fromPrompt.seasons.length ? fromPrompt.seasons : sharedSeasons(pinned),
+      seasons: fromPrompt.seasons.length ? fromPrompt.seasons : weatherSeasons.length ? weatherSeasons : sharedSeasons(pinned),
+      weatherSeasons,
     }
 
     const covered = new Set(pinned.map((i) => i.category))
@@ -159,7 +166,7 @@ export class RuleBasedStyleAdvisor implements StyleAdvisor {
       itemIds: look.map((i) => i.id),
       aiItemIds: added.map((i) => i.id),
       explanation: explain(pinned, added, occasion, prompt),
-      rating: rate(look, wardrobe),
+      rating: rate(look, wardrobe, request.weather),
     }
   }
 }
@@ -172,8 +179,8 @@ function explain(pinned: Item[], added: Item[], occasion: Occasion, prompt?: str
   return `Rated exactly as you picked it: ${names(pinned)}.${brief}`
 }
 
-/** A blunt, rule-based critique. Base 6; earns points for discipline, loses them for confusion. */
-export function rate(look: readonly Item[], wardrobe: readonly Item[]): StyleRating {
+/** A blunt, rule-based critique. Base 6; earns points for discipline, loses them for confusion (and for ignoring the weather). */
+export function rate(look: readonly Item[], wardrobe: readonly Item[], weather?: DayWeather | null): StyleRating {
   const works: string[] = []
   const fails: string[] = []
   const fixes: StyleFix[] = []
@@ -192,6 +199,41 @@ export function rate(look: readonly Item[], wardrobe: readonly Item[]): StyleRat
   if (look.length > 6) {
     score -= 1
     fails.push('Seven-plus pieces. Edit before you leave the house.')
+  }
+
+  // Weather: the look goes outside today.
+  if (weather) {
+    const before = fails.length
+    const feel = feelOf(weather)
+    const suits = seasonsForWeather(weather)
+    const day = `${Math.round(weather.feelsLikeMax)}°${isWet(weather) ? ` ${weather.summary.toLowerCase()}` : ''} day`
+    const coatDay = feel === 'cold' || feel === 'cool' || isWet(weather)
+    if (coatDay && !has('outerwear')) {
+      const warmest = wardrobe
+        .filter((i) => i.category === 'outerwear')
+        .sort((a, b) => Number(b.seasons.some((s) => suits.includes(s))) - Number(a.seasons.some((s) => suits.includes(s))) || a.id.localeCompare(b.id))[0]
+      if (warmest) {
+        score -= 2
+        fails.push(`No coat on a ${day}. You'll be cold by noon.`)
+        fixes.push({ addItemId: warmest.id, note: `Add the ${warmest.name}.` })
+      }
+    }
+    const wrong = look.filter((i) => i.seasons.length && !i.seasons.some((s) => suits.includes(s)))
+    for (const piece of wrong.slice(0, 2)) {
+      score -= 2
+      const why = feel === 'hot' || feel === 'warm' ? 'far too heavy' : 'far too light'
+      fails.push(`The ${piece.name} is ${why} for a ${day}.`)
+      const swap = alternative(piece, (i) => i.seasons.length === 0 || i.seasons.some((s) => suits.includes(s)))
+      fixes.push(
+        swap
+          ? { removeItemId: piece.id, addItemId: swap.id, note: `Swap the ${piece.name} for the ${swap.name}.` }
+          : { removeItemId: piece.id, note: `Lose the ${piece.name}.` },
+      )
+    }
+    if (fails.length === before) {
+      score += 1
+      works.push(`Dressed for the day: ${weather.summary.toLowerCase()}, ${Math.round(weather.tempMin)}–${Math.round(weather.tempMax)}°.`)
+    }
   }
 
   // Occasion: everything should agree on why you're dressed.

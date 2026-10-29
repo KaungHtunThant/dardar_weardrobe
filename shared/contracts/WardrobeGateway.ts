@@ -5,6 +5,7 @@ import type { Item, ItemDetailsInput } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
 import type { StyleRequestInput } from '../models/styleRequest'
 import type { SettingsUpdate, SettingsView } from '../models/settings'
+import type { DayWeather, Place } from '../models/weather'
 import type { StyleCallOptions } from './StyleAdvisor'
 
 /** Result of preparing an uploaded photo: the original and the garment-only version. */
@@ -68,10 +69,28 @@ export interface SettingsGateway {
   recreateAgent(): Promise<SettingsView>
 }
 
+/** The weather where the user lives, and finding their city. */
+export interface WeatherGateway {
+  /** The forecast for a YYYY-MM-DD date in the user's city; null without a city or a forecast. */
+  getWeather(date: string): Promise<DayWeather | null>
+  /** Cities matching a name, most likely first. */
+  searchPlaces(query: string): Promise<Place[]>
+  /** A guess at where this computer is (null when it can't tell). */
+  locatePlace(): Promise<Place | null>
+}
+
 export interface DataGateway {
   /** Deletes every item, photo and look so the user can start fresh. Settings and the API key stay. */
   clearWardrobe(): Promise<void>
 }
 
 /** Everything the frontend needs from the outside world. Stores depend on this, never on an implementation. */
-export interface WardrobeGateway extends ItemGateway, PhotoGateway, UploadGateway, StyleMatchGateway, StylingGateway, SettingsGateway, DataGateway {}
+export interface WardrobeGateway
+  extends ItemGateway,
+    PhotoGateway,
+    UploadGateway,
+    StyleMatchGateway,
+    StylingGateway,
+    SettingsGateway,
+    WeatherGateway,
+    DataGateway {}

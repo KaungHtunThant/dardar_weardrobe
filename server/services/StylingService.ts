@@ -7,6 +7,7 @@ import { StyleRequestSchema } from '#shared/models/styleRequest'
 import { lookFromSuggestion } from '#shared/utils/looks'
 import type { Clock } from './clock'
 import { parseOrThrow } from './validation'
+import type { DailyWeather } from './WeatherService'
 
 /** Style Studio: completes the user's picks with the configured advisor, rates the look and saves it. */
 export class StylingService {
@@ -16,6 +17,8 @@ export class StylingService {
     /** Resolved per request so a settings change takes effect immediately. */
     private readonly advisor: () => StyleAdvisor | Promise<StyleAdvisor>,
     private readonly clock: Clock,
+    /** Today's forecast where the user lives. */
+    private readonly weather?: DailyWeather,
   ) {}
 
   /** With `onProgress`, reports as the look takes shape; aborting `signal` stops the stylist and saves nothing. */
@@ -27,9 +30,11 @@ export class StylingService {
     if (unknown) throw new ValidationError(`Unknown piece: ${unknown}`)
 
     onProgress?.({ stage: 'reading', aiItemIds: [] })
-    const suggestion = await (await this.advisor()).suggestLook({ wardrobe, ...request }, { signal, onProgress })
+    const { dressForWeather, ...ask } = request
+    const weather = dressForWeather ? await this.weather?.today({ signal }) : null
+    const suggestion = await (await this.advisor()).suggestLook({ wardrobe, ...ask, ...(weather ? { weather } : {}) }, { signal, onProgress })
     signal?.throwIfAborted()
-    const look = lookFromSuggestion(suggestion, request, `look-${this.clock.newId()}`, this.clock.now())
+    const look = lookFromSuggestion(suggestion, { ...ask, weather }, `look-${this.clock.newId()}`, this.clock.now())
     return this.looks.insert(look)
   }
 }

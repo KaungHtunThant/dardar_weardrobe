@@ -12,6 +12,8 @@ export interface ServerConfig {
   allowReset: boolean
   /** First-run stylist: 'auto' (CLI → API → Offline) or a fixed mode (e2e uses 'offline'). */
   defaultAdvisor: 'auto' | AdvisorMode
+  /** Live forecasts and city search, or the offline demo (e2e). */
+  weather: 'open-meteo' | 'demo'
 }
 
 const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort
@@ -29,6 +31,7 @@ export function useApi(config: ServerConfig) {
       allowReset: config.allowReset,
       dataDir,
       defaultAdvisor: config.defaultAdvisor,
+      weather: config.weather,
       imaging: 'studio',
       // Inside the packaged app the server runs as an Electron utility process: keep the key in the OS keychain.
       secrets: parentPort ? new ElectronSecretStore(parentPort) : undefined,

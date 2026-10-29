@@ -115,6 +115,11 @@ export class SettingsService {
     return this.get()
   }
 
+  /** Where the user lives (null until they say). */
+  async location() {
+    return (await this.current()).location
+  }
+
   /** The advisor for the next request, per the current settings. */
   async resolveAdvisor(): Promise<StyleAdvisor> {
     const settings = await this.current()

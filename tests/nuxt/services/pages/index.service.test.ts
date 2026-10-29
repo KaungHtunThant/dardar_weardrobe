@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
+import { DEMO_PLACES } from '#shared/weather/DemoWeather'
 import { useHomePage } from '~/services/pages/index.service'
+import { useSettingsStore } from '~/stores/settings'
 import { setupTestGateway } from '../../helpers'
+
+const tokyo = DEMO_PLACES.find((p) => p.name === 'Tokyo')!
 
 describe('home page service', () => {
   let gateway: ReturnType<typeof setupTestGateway>
@@ -30,6 +34,67 @@ describe('home page service', () => {
     await vm.dismissWelcome()
     expect(vm.welcome.value).toBeNull()
     expect((await gateway.getSettings()).welcomed).toBe(true)
+  })
+
+  it('suggests where the user lives on first launch, and saves it with the welcome', async () => {
+    const vm = useHomePage()
+    await vm.init()
+    await flushPromises()
+    expect(vm.welcomePlace.value).toBe('Paris, France')
+    expect(vm.welcomeLocating.value).toBe(false)
+    expect(vm.pickingPlace.value).toBe(false)
+    await vm.dismissWelcome()
+    expect((await gateway.getSettings()).location).toMatchObject({ name: 'Paris' })
+  })
+
+  it('lets the user pick another city before saying hello', async () => {
+    const vm = useHomePage()
+    await vm.init()
+    await flushPromises()
+    vm.changePlace()
+    expect(vm.pickingPlace.value).toBe(true)
+    vm.pickPlace(tokyo)
+    expect(vm.welcomePlace.value).toBe('Tokyo, Japan')
+    expect(vm.pickingPlace.value).toBe(false)
+    await vm.dismissWelcome()
+    expect((await gateway.getSettings()).location).toMatchObject({ name: 'Tokyo' })
+  })
+
+  it("offers the city search when it can't tell where the user is, and can be skipped", async () => {
+    vi.spyOn(gateway, 'locatePlace').mockResolvedValue(null)
+    const vm = useHomePage()
+    await vm.init()
+    await flushPromises()
+    expect(vm.welcomePlace.value).toBeNull()
+    expect(vm.pickingPlace.value).toBe(true)
+    await vm.dismissWelcome()
+    const settings = await gateway.getSettings()
+    expect(settings).toMatchObject({ welcomed: true, location: null })
+  })
+
+  it("asks for today's look again once the city is saved, so it suits the weather", async () => {
+    const vm = useHomePage()
+    await vm.init()
+    await flushPromises()
+    const spy = vi.spyOn(gateway, 'getTodayLook')
+    await vm.dismissWelcome()
+    expect(spy).toHaveBeenCalledWith('2026-10-28')
+  })
+
+  it("shows the weather today's look was styled for, or invites the user to add a city", async () => {
+    await gateway.updateSettings({ welcomed: true })
+    const vm = useHomePage()
+    await vm.init()
+    expect(vm.todayWeather.value).toBeNull()
+    expect(vm.askForCity.value).toBe(true)
+
+    await useSettingsStore().update({ location: tokyo })
+    const look = (await gateway.generateLook({ fillCategories: ['tops', 'bottoms'] }))!
+    vi.spyOn(gateway, 'getTodayLook').mockResolvedValue({ ...look, dailyPickDate: '2026-10-28' })
+    const again = useHomePage()
+    await again.init()
+    expect(again.askForCity.value).toBe(false)
+    expect(again.todayWeather.value).toMatchObject({ icon: expect.stringMatching(/^lucide:/), label: expect.stringContaining('in Tokyo, Japan') })
   })
 
   it("moves through the stylist's stages while today's look is being styled", async () => {

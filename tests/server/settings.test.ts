@@ -103,6 +103,22 @@ describe('SettingsService', () => {
     expect((await service().update({ welcomed: true })).welcomed).toBe(true)
   })
 
+  it('changes only what an update names; the other choices stay', async () => {
+    await service().update({ advisor: 'offline', model: 'claude-haiku-5-5', effort: 'high' })
+    const view = await service().update({ welcomed: true })
+    expect(view).toMatchObject({ model: 'claude-haiku-5-5', effort: 'high', welcomed: true })
+  })
+
+  it('remembers where the user lives, and forgets it on request', async () => {
+    const paris = { name: 'Paris', country: 'France', latitude: 48.85, longitude: 2.35 }
+    expect((await service().get()).location).toBeNull()
+    expect((await service().update({ location: paris })).location).toEqual({ ...paris, region: null, timezone: null })
+    expect(await service().location()).toMatchObject({ name: 'Paris' })
+    expect((await service().update({ welcomed: true })).location).toMatchObject({ name: 'Paris' })
+    expect((await service().update({ location: null })).location).toBeNull()
+    await expect(service().update({ location: { ...paris, latitude: 200 } })).rejects.toBeInstanceOf(ValidationError)
+  })
+
   it('recreates the stylist agent on request', async () => {
     let now = '2026-10-28T10:00:00Z'
     const agent = new LocalStylistAgent(join(dir, 'agent'), { now: () => new Date(now), newId: () => 'x' })

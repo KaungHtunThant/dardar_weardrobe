@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { KeyStorage } from '../contracts/SecretStore'
 import type { StylistAgentInfo } from './agent'
+import { PlaceSchema } from './weather'
 
 export const ADVISOR_MODES = ['claude-cli', 'claude-api', 'offline'] as const
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
@@ -9,22 +10,33 @@ export const DEFAULT_MODEL = 'claude-opus-5-5'
 export const AdvisorModeSchema = z.enum(ADVISOR_MODES)
 export type AdvisorMode = z.infer<typeof AdvisorModeSchema>
 
-/** What the user chooses on the Settings page (persisted). */
-export const SettingsSchema = z.object({
+const fields = {
   advisor: AdvisorModeSchema,
   /** Used by both the CLI and the API. */
-  model: z.string().trim().min(1).max(100).default(DEFAULT_MODEL),
+  model: z.string().trim().min(1).max(100),
   /** API only: how hard Claude thinks (cost vs. depth). */
-  effort: z.enum(EFFORTS).default('medium'),
+  effort: z.enum(EFFORTS),
   /** The user has seen the one-time "meet your stylist" welcome. */
-  welcomed: z.boolean().default(false),
+  welcomed: z.boolean(),
+  /** Where the user lives, so looks suit the weather (null until they say). */
+  location: PlaceSchema.nullable(),
+}
+
+/** What the user chooses on the Settings page (persisted). */
+export const SettingsSchema = z.object({
+  ...fields,
+  model: fields.model.default(DEFAULT_MODEL),
+  effort: fields.effort.default('medium'),
+  welcomed: fields.welcomed.default(false),
+  location: fields.location.default(null),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
-/** A partial change; `apiKey: null` removes the stored key. */
-export const SettingsUpdateSchema = SettingsSchema.partial().extend({
-  apiKey: z.string().trim().min(1).max(500).nullable().optional(),
-})
+/** A partial change: only the named choices change (no defaults here). `apiKey: null` removes the stored key. */
+export const SettingsUpdateSchema = z
+  .object(fields)
+  .partial()
+  .extend({ apiKey: z.string().trim().min(1).max(500).nullable().optional() })
 export type SettingsUpdate = z.input<typeof SettingsUpdateSchema>
 
 /** Settings as shown to the UI: never contains the key itself. */

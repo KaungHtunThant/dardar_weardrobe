@@ -5,6 +5,7 @@ import type { StyleMatch } from '#shared/models/styleMatch'
 import type { StyleRequestInput } from '#shared/models/styleRequest'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { SettingsUpdate, SettingsView } from '#shared/models/settings'
+import type { DayWeather, Place } from '#shared/models/weather'
 import type { CategoryId } from '#shared/models/category'
 import type { Upload } from '#shared/models/upload'
 import type { StyleCallOptions, StyleProgress } from '#shared/contracts/StyleAdvisor'
@@ -140,6 +141,18 @@ export class HttpWardrobeGateway implements WardrobeGateway {
 
   recreateAgent() {
     return this.call(() => this.api<SettingsView>('/api/agent/recreate', { method: 'POST' }))
+  }
+
+  async getWeather(date: string) {
+    return (await this.call(() => this.api<{ weather: DayWeather | null }>('/api/weather', { query: { date } }))).weather
+  }
+
+  searchPlaces(query: string) {
+    return this.call(() => this.api<Place[]>('/api/places', { query: { q: query } }))
+  }
+
+  async locatePlace() {
+    return (await this.call(() => this.api<{ place: Place | null }>('/api/places/here'))).place
   }
 
   async clearWardrobe() {

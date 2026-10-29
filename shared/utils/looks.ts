@@ -2,6 +2,7 @@ import type { StyleSuggestion } from '../contracts/StyleAdvisor'
 import { ValidationError } from '../errors'
 import type { Item } from '../models/item'
 import type { StyleMatch } from '../models/styleMatch'
+import type { DayWeather } from '../models/weather'
 import { sortNewestFirst } from './wardrobe'
 
 export function recentLooks(looks: readonly StyleMatch[], limit: number): StyleMatch[] {
@@ -52,7 +53,7 @@ export function withoutItem(look: StyleMatch, itemId: string): StyleMatch | null
 /** The saved look for an advisor's suggestion (used by every gateway/back end that generates looks). */
 export function lookFromSuggestion(
   suggestion: StyleSuggestion,
-  request: { prompt?: string },
+  request: { prompt?: string; weather?: DayWeather | null },
   id: string,
   now: Date,
 ): StyleMatch {
@@ -67,6 +68,7 @@ export function lookFromSuggestion(
     explanation: suggestion.explanation,
     rating: suggestion.rating,
     isFavourite: false,
+    ...(request.weather ? { weather: request.weather } : {}),
     createdAt: now.toISOString(),
   }
 }

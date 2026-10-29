@@ -6,3 +6,8 @@ export class ValidationError extends Error {
 export class NotFoundError extends Error {
   override name = 'NotFoundError'
 }
+
+/** An outside service the feature needs (e.g. the city search) can't be reached right now. */
+export class UnavailableError extends Error {
+  override name = 'UnavailableError'
+}

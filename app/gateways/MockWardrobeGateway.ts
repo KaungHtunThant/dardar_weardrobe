@@ -7,6 +7,10 @@ import type { Upload, UploadStage } from '#shared/models/upload'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
 import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type Settings, type SettingsUpdate, type SettingsView } from '#shared/models/settings'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
+import type { PlaceDirectory, PlaceLocator } from '#shared/contracts/PlaceFinder'
+import type { WeatherProvider } from '#shared/contracts/WeatherProvider'
+import { localIsoDate } from '#shared/utils/date'
+import { DemoPlaceDirectory, DemoPlaceLocator, DemoWeatherProvider } from '#shared/weather/DemoWeather'
 import { lookFromSuggestion, todaysPick, withoutItem } from '#shared/utils/looks'
 import type { SnapshotStore, WardrobeSnapshot } from './persistence/SnapshotStore'
 
@@ -19,6 +23,8 @@ export interface MockGatewayOptions {
   newId?: () => string
   /** Who completes and rates looks. Defaults to the rule-based (offline) advisor. */
   advisor?: StyleAdvisor
+  /** Forecasts and cities; default to the offline demo services. */
+  weather?: { provider?: WeatherProvider; places?: PlaceDirectory; locator?: PlaceLocator }
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -38,7 +44,10 @@ export class MockWardrobeGateway implements WardrobeGateway {
   private readonly newId: () => string
   private readonly advisor: StyleAdvisor
   /** Prototype only: settings live in memory and every mode styles with the offline advisor. */
-  private settings: Settings = { advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium', welcomed: false }
+  private settings: Settings = { advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium', welcomed: false, location: null }
+  private readonly forecasts: WeatherProvider
+  private readonly places: PlaceDirectory
+  private readonly locator: PlaceLocator
   private agentCreatedAt = new Date().toISOString()
   private apiKey: string | null = null
   /** Prototype only: the upload queue lives in memory. */
@@ -53,6 +62,9 @@ export class MockWardrobeGateway implements WardrobeGateway {
     this.now = options.now ?? (() => new Date())
     this.newId = options.newId ?? (() => crypto.randomUUID())
     this.advisor = options.advisor ?? new RuleBasedStyleAdvisor()
+    this.forecasts = options.weather?.provider ?? new DemoWeatherProvider(this.now)
+    this.places = options.weather?.places ?? new DemoPlaceDirectory()
+    this.locator = options.weather?.locator ?? new DemoPlaceLocator()
   }
 
   private data() {
@@ -234,11 +246,12 @@ export class MockWardrobeGateway implements WardrobeGateway {
 
   /** Prototype: styles instantly, then replays the AI's picks and verdict as progress, as a real stylist streams them. */
   async generateLook(input: StyleRequestInput, { signal, onProgress }: StyleCallOptions = {}): Promise<StyleMatch> {
-    const request = StyleRequestSchema.parse(input)
+    const { dressForWeather, ...request } = StyleRequestSchema.parse(input)
     signal?.throwIfAborted()
     onProgress?.({ stage: 'reading', aiItemIds: [] })
     const data = await this.data()
-    const suggestion = await this.advisor.suggestLook({ wardrobe: data.items, ...request }, { signal })
+    const weather = dressForWeather ? await this.getWeather(localIsoDate(this.now())) : null
+    const suggestion = await this.advisor.suggestLook({ wardrobe: data.items, ...request, weather }, { signal })
     const step = async () => {
       await this.wait()
       signal?.throwIfAborted()
@@ -251,7 +264,7 @@ export class MockWardrobeGateway implements WardrobeGateway {
     }
     onProgress?.({ stage: 'rating', title, aiItemIds, verdict: suggestion.rating.verdict })
     await step()
-    const look = lookFromSuggestion(suggestion, request, `look-${this.newId()}`, this.now())
+    const look = lookFromSuggestion(suggestion, { ...request, weather }, `look-${this.newId()}`, this.now())
     data.styleMatches.push(look)
     await this.persist()
     return structuredClone(look)
@@ -289,6 +302,21 @@ export class MockWardrobeGateway implements WardrobeGateway {
     if (apiKey !== undefined) this.apiKey = apiKey
     this.settings = SettingsSchema.parse({ ...this.settings, ...changes })
     return this.settingsView()
+  }
+
+  async getWeather(date: string) {
+    await this.wait()
+    return this.settings.location ? this.forecasts.forecast(this.settings.location, date) : null
+  }
+
+  async searchPlaces(query: string) {
+    await this.wait()
+    return this.places.search(query)
+  }
+
+  async locatePlace() {
+    await this.wait(3)
+    return this.locator.locate()
   }
 
   async clearWardrobe() {

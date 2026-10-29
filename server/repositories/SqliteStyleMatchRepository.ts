@@ -6,18 +6,19 @@ import { styleMatches } from '../database/schema'
 
 type Row = typeof styleMatches.$inferSelect
 
-function toLook({ aiItemIds, prompt, rating, dailyPickDate, ...rest }: Row): StyleMatch {
+function toLook({ aiItemIds, prompt, rating, dailyPickDate, weather, ...rest }: Row): StyleMatch {
   return {
     ...rest,
     ...(aiItemIds != null ? { aiItemIds } : {}),
     ...(prompt != null ? { prompt } : {}),
     ...(rating != null ? { rating } : {}),
     ...(dailyPickDate != null ? { dailyPickDate } : {}),
+    ...(weather != null ? { weather } : {}),
   }
 }
 
 function toRow(look: StyleMatch) {
-  return { aiItemIds: null, prompt: null, rating: null, dailyPickDate: null, ...look }
+  return { aiItemIds: null, prompt: null, rating: null, dailyPickDate: null, weather: null, ...look }
 }
 
 export class SqliteStyleMatchRepository implements StyleMatchRepository {

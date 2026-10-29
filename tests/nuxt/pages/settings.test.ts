@@ -15,6 +15,20 @@ describe('settings page', () => {
     warn.mockRestore()
   })
 
+  it('adds a city from the search and shows it', async () => {
+    const wrapper = await mountSuspended(SettingsPage, { route: '/settings' })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="location-label"]').text()).toMatch(/no city yet/i)
+    await wrapper.findAll('button').find((b) => b.text() === 'Add your city')!.trigger('click')
+    await wrapper.get('#city-search').setValue('Copen')
+    await wrapper.get('form[role="search"]').trigger('submit')
+    await flushPromises()
+    await wrapper.findAll('[aria-label="Cities"] button')[0]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="location-label"]').text()).toBe('Copenhagen, Denmark')
+    expect(wrapper.find('[data-testid="location-picker"]').exists()).toBe(false)
+  })
+
   it('switches to the API, shows the key field, and saves', async () => {
     const wrapper = await mountSuspended(SettingsPage, { route: '/settings' })
     await flushPromises()

@@ -45,7 +45,7 @@ describe('StyleMatch with rating', () => {
 describe('StyleRequest', () => {
   it('defaults to no pins and no AI categories, and trims the prompt', () => {
     const req = StyleRequestSchema.parse({ fillCategories: ['tops'], prompt: '  brunch  ' })
-    expect(req).toEqual({ pinnedItemIds: [], fillCategories: ['tops'], prompt: 'brunch' })
+    expect(req).toEqual({ pinnedItemIds: [], fillCategories: ['tops'], dressForWeather: true, prompt: 'brunch' })
   })
 
   it('drops a blank prompt', () => {

@@ -94,6 +94,9 @@ const vm = useStudioPage()
             @click="vm.toggleFavourite"
           />
         </div>
+        <p v-if="vm.resultWeather.value" class="mb-3 flex items-center gap-1.5 px-1 text-xs text-taupe" data-testid="verdict-weather">
+          <Icon :name="vm.resultWeather.value.icon" class="size-4 text-rose" /> {{ vm.resultWeather.value.label }}
+        </p>
         <p v-if="vm.stale.value" class="mb-3 rounded-xl bg-cream px-3 py-2 text-xs text-taupe">
           You've changed the outfit since this verdict. Rate it again to update.
         </p>
@@ -115,6 +118,28 @@ const vm = useStudioPage()
           </p>
           <StudioFillToggles :options="vm.fillOptions.value" @toggle="vm.toggleFill" />
         </div>
+        <button
+          v-if="vm.weather.value"
+          type="button"
+          role="switch"
+          :aria-checked="vm.weather.value.on"
+          class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors"
+          :class="vm.weather.value.on ? 'bg-blush-soft text-ink' : 'bg-ivory text-taupe'"
+          data-testid="studio-weather"
+          @click="vm.toggleWeather"
+        >
+          <Icon :name="vm.weather.value.icon" class="size-4 shrink-0" :class="vm.weather.value.on ? 'text-rose' : 'text-taupe'" />
+          <span class="min-w-0 flex-1 truncate">
+            <span class="font-medium">Dress for today's weather</span> · {{ vm.weather.value.label }}
+          </span>
+          <span class="relative h-4 w-7 shrink-0 rounded-full transition-colors" :class="vm.weather.value.on ? 'bg-rose' : 'bg-line'">
+            <span class="absolute top-0.5 size-3 rounded-full bg-white transition-all" :class="vm.weather.value.on ? 'left-3.5' : 'left-0.5'" />
+          </span>
+        </button>
+        <p v-else-if="vm.askForCity.value" class="flex items-center gap-1.5 px-1 text-xs text-taupe" data-testid="studio-ask-for-city">
+          <Icon name="lucide:cloud-sun" class="size-4 text-rose" />
+          <NuxtLink to="/settings" class="underline underline-offset-2 hover:text-ink">Add your city</NuxtLink> to dress for the weather.
+        </p>
         <label for="studio-prompt" class="sr-only">Describe the vibe (optional)</label>
         <input
           id="studio-prompt"

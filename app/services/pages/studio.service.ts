@@ -3,11 +3,14 @@ import { useRoute } from '#imports'
 import { CATEGORIES, type CategoryId } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
 import type { StyleFix } from '#shared/models/styleMatch'
+import { localIsoDate } from '#shared/utils/date'
 import { slotFor, wear, type BodySlot } from '#shared/utils/outfit'
 import type { CategoryFilter } from '#shared/utils/wardrobe'
+import { weatherIcon, weatherLine } from '#shared/utils/weather'
 import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
+import { useWeatherStore } from '~/stores/weather'
 import { onViewMounted } from '~/services/lifecycle'
 import { useItemSheetRoute } from '~/services/shared/itemSheetRoute'
 
@@ -59,6 +62,7 @@ export function useStudioPage() {
   const wardrobe = useWardrobeStore()
   const looks = useStyleMatchesStore()
   const settings = useSettingsStore()
+  const forecasts = useWeatherStore()
   const sheet = useItemSheetRoute()
   const route = useRoute()
 
@@ -66,6 +70,8 @@ export function useStudioPage() {
   const aiIds = ref<string[]>([])
   const fill = ref<CategoryId[]>([...DEFAULT_FILL])
   const prompt = ref('')
+  /** Dress for today's weather (when there is a forecast for the user's city). */
+  const weatherOn = ref(true)
   const panelCategory = ref<CategoryFilter>('all')
   const panelTab = ref<PanelTab>('wardrobe')
   const resultId = ref<string | null>(null)
@@ -145,6 +151,16 @@ export function useStudioPage() {
         return 'Reading your wardrobe…'
     }
   })
+  const weather = computed(() => {
+    const w = forecasts.forecast
+    return w ? { icon: weatherIcon(w.condition), label: `${weatherLine(w)} in ${w.place}`, on: weatherOn.value } : null
+  })
+  const askForCity = computed(() => Boolean(settings.view && !settings.view.location))
+  /** The weather the shown verdict was given for. */
+  const resultWeather = computed(() => {
+    const w = result.value?.weather
+    return w ? { icon: weatherIcon(w.condition), label: `Rated for ${weatherLine(w).toLowerCase()} in ${w.place}` } : null
+  })
   const liveTitle = computed(() => progress.value?.title ?? '')
   const liveVerdict = computed(() => progress.value?.verdict ?? '')
 
@@ -179,6 +195,10 @@ export function useStudioPage() {
     panelTab.value = tab
   }
 
+  function toggleWeather() {
+    weatherOn.value = !weatherOn.value
+  }
+
   function toggleFill(id: CategoryId) {
     fill.value = fill.value.includes(id) ? fill.value.filter((c) => c !== id) : [...fill.value, id]
   }
@@ -188,7 +208,7 @@ export function useStudioPage() {
     pending.value = pinned
     let look
     try {
-      look = await looks.generate({ pinnedItemIds: pinned, fillCategories, prompt: prompt.value })
+      look = await looks.generate({ pinnedItemIds: pinned, fillCategories, prompt: prompt.value, dressForWeather: weatherOn.value })
     } finally {
       pending.value = null
     }
@@ -241,7 +261,7 @@ export function useStudioPage() {
   }
 
   async function init() {
-    await Promise.all([wardrobe.load(), looks.load(), settings.load()])
+    await Promise.all([wardrobe.load(), looks.load(), settings.load(), forecasts.load(localIsoDate(new Date()))])
     const lookId = (route.query as Record<string, string | undefined>).look
     if (lookId) openLook(lookId)
   }
@@ -270,6 +290,10 @@ export function useStudioPage() {
     fixes,
     error,
     stylistLabel,
+    weather,
+    askForCity,
+    resultWeather,
+    toggleWeather,
     loading,
     init,
     isWorn,

@@ -7,6 +7,7 @@ import { PhotoController } from '../controllers/PhotoController'
 import { SettingsController } from '../controllers/SettingsController'
 import { UploadController } from '../controllers/UploadController'
 import { WardrobeController } from '../controllers/WardrobeController'
+import { WeatherController } from '../controllers/WeatherController'
 import { toHttpError } from './errors'
 
 const handle = (fn: (event: H3Event) => unknown) =>
@@ -30,6 +31,7 @@ export function createApiRouter(c: Container) {
   const looks = new LookController(c.looks, c.styling, c.today)
   const settings = new SettingsController(c.settings)
   const wardrobe = new WardrobeController(() => c.clearWardrobe())
+  const weather = new WeatherController(c.weather)
 
   const router = createRouter({ preemptive: true })
     .get('/api/items', handle(() => items.list()))
@@ -54,6 +56,9 @@ export function createApiRouter(c: Container) {
     .get('/api/settings', handle(() => settings.show()))
     .put('/api/settings', handle((e) => settings.update(e)))
     .post('/api/agent/recreate', handle(() => settings.recreateAgent()))
+    .get('/api/weather', handle((e) => weather.day(e)))
+    .get('/api/places', handle((e) => weather.searchPlaces(e)))
+    .get('/api/places/here', handle(() => weather.here()))
     .post('/api/wardrobe/clear', handle((e) => wardrobe.clear(e)))
 
   if (c.allowReset) router.post('/api/dev/reset', handle(async () => ({ reset: await c.reset() })))

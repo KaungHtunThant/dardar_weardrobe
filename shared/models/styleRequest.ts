@@ -15,6 +15,8 @@ export const StyleRequestSchema = z
       .default([]),
     fillCategories: z.array(CategoryIdSchema).default([]),
     prompt: optionalText(500),
+    /** Dress for today's weather where the user lives (when a city is set and a forecast is available). */
+    dressForWeather: z.boolean().default(true),
   })
   .refine((r) => r.pinnedItemIds.length > 0 || r.fillCategories.length > 0, {
     message: 'Pick a piece or let the AI fill at least one category',

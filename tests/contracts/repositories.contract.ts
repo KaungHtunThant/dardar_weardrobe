@@ -61,10 +61,22 @@ export function styleMatchRepositoryContract(name: string, make: () => StyleMatc
       fixes: [{ removeItemId: 'a', addItemId: 'b', note: 'Swap.' }],
     },
     dailyPickDate: '2026-10-28',
+    weather: {
+      date: '2026-10-28',
+      place: 'London, United Kingdom',
+      condition: 'rain' as const,
+      summary: 'Light rain',
+      tempMin: 4,
+      tempMax: 9.5,
+      feelsLikeMin: 1,
+      feelsLikeMax: 6,
+      precipitationChance: 85,
+      windMax: 30,
+    },
   }
 
   describe(`StyleMatchRepository contract: ${name}`, () => {
-    it('round-trips looks, including ratings, prompts and AI picks', async () => {
+    it('round-trips looks, including ratings, prompts, AI picks and weather', async () => {
       const repo = make()
       await repo.insert(rated)
       await repo.insert(seedStyleMatches[0]!)

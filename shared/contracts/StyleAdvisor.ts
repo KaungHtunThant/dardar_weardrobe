@@ -1,6 +1,7 @@
 import type { CategoryId } from '../models/category'
 import type { Item } from '../models/item'
 import type { StyleRating } from '../models/styleMatch'
+import type { DayWeather } from '../models/weather'
 
 export interface StyleAdvisorRequest {
   wardrobe: readonly Item[]
@@ -10,6 +11,8 @@ export interface StyleAdvisorRequest {
   fillCategories: readonly CategoryId[]
   /** Optional custom prompt; without it the advisor picks a style itself. */
   prompt?: string
+  /** The day's forecast where the user lives: dress for it and judge the look against it. */
+  weather?: DayWeather | null
 }
 
 export interface StyleSuggestion {

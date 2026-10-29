@@ -73,7 +73,9 @@ export const useStyleMatchesStore = defineStore('styleMatches', () => {
     todayLoading.value = true
     try {
       const look = await useGateway().getTodayLook(date)
-      if (look && !looks.value.some((l) => l.id === look.id)) looks.value = [...looks.value, look]
+      // A pick restyled for a new city replaces the old one: there is one per day.
+      if (look && !looks.value.some((l) => l.id === look.id))
+        looks.value = [...looks.value.filter((l) => l.dailyPickDate !== date), look]
       todayId.value = look?.id ?? null
     } catch (e) {
       error.value = message(e)

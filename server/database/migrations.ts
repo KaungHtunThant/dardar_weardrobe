@@ -42,6 +42,7 @@ const MIGRATIONS: string[] = [
      error TEXT,
      created_at TEXT NOT NULL
    );`,
+  `ALTER TABLE style_matches ADD COLUMN weather TEXT;`,
 ]
 
 export function migrate(sqlite: DatabaseSync) {

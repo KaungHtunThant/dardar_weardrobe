@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import type { StyleCallOptions } from '#shared/contracts/StyleAdvisor'
 import { useRouter } from '#imports'
+import { DEMO_PLACES } from '#shared/weather/DemoWeather'
 import { useStudioPage } from '~/services/pages/studio.service'
 import { setupTestGateway } from '../../helpers'
 
@@ -151,6 +152,29 @@ describe('studio page service', () => {
     expect(vm.placed.value).toEqual([])
     expect(vm.result.value).toBeNull()
     expect(vm.panelTab.value).toBe('wardrobe')
+  })
+
+  it("dresses for today's weather where the user lives, and can be told not to", async () => {
+    await gateway.updateSettings({ location: DEMO_PLACES.find((p) => p.name === 'London')! })
+    const spy = vi.spyOn(gateway, 'generateLook')
+    const vm = await ready()
+    expect(vm.weather.value).toMatchObject({ on: true, icon: expect.stringMatching(/^lucide:/), label: expect.stringContaining('London') })
+    expect(vm.askForCity.value).toBe(false)
+    await vm.generate()
+    expect(spy.mock.calls[0]![0]).toMatchObject({ dressForWeather: true })
+    expect(vm.resultWeather.value).toMatchObject({ icon: expect.stringMatching(/^lucide:/), label: expect.stringMatching(/^Rated for .+ in London, United Kingdom$/) })
+
+    vm.toggleWeather()
+    expect(vm.weather.value?.on).toBe(false)
+    await vm.generate()
+    expect(spy.mock.calls[1]![0]).toMatchObject({ dressForWeather: false })
+    expect(vm.resultWeather.value).toBeNull()
+  })
+
+  it('invites the user to add a city when there is none', async () => {
+    const vm = await ready()
+    expect(vm.weather.value).toBeNull()
+    expect(vm.askForCity.value).toBe(true)
   })
 
   it('names the active stylist', async () => {

@@ -2,9 +2,12 @@ import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ImageProcessor } from '#shared/contracts/ImageProcessor'
+import type { PlaceDirectory, PlaceLocator } from '#shared/contracts/PlaceFinder'
+import type { WeatherProvider } from '#shared/contracts/WeatherProvider'
 import type { SecretStore } from '#shared/contracts/SecretStore'
 import type { StylistAgent } from '#shared/contracts/StylistAgent'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
+import { DemoPlaceDirectory, DemoPlaceLocator, DemoWeatherProvider } from '#shared/weather/DemoWeather'
 import type { AdvisorMode } from '#shared/models/settings'
 import { ClaudeApiGarmentAnalyst } from './ai/ClaudeApiGarmentAnalyst'
 import { ClaudeApiStyleAdvisor } from './ai/ClaudeApiStyleAdvisor'
@@ -37,9 +40,14 @@ import { StylingService } from './services/StylingService'
 import { TaggingService } from './services/TaggingService'
 import { TodayService } from './services/TodayService'
 import { UploadService } from './services/UploadService'
+import { WeatherService } from './services/WeatherService'
 import { FileSecretStore } from './settings/FileSecretStore'
 import { SettingsService, type AdvisorFactory, type AnalystFactory, type TaggerFactory } from './settings/SettingsService'
 import { SettingsStore } from './settings/SettingsStore'
+import { CachedWeatherProvider } from './weather/CachedWeatherProvider'
+import { GeoJsPlaceLocator } from './weather/GeoJsPlaceLocator'
+import { OpenMeteoPlaceDirectory } from './weather/OpenMeteoPlaceDirectory'
+import { OpenMeteoWeather } from './weather/OpenMeteoWeather'
 
 export interface ContainerOptions {
   databasePath: string
@@ -61,6 +69,12 @@ export interface ContainerOptions {
   analysts?: AnalystFactory
   defaultAdvisor?: 'auto' | AdvisorMode
   envApiKey?: () => string | null
+  /** Forecasts and city search: Open-Meteo in the app; the offline demo in tests and e2e (the default). */
+  weather?: 'demo' | 'open-meteo'
+  /** Overrides for single weather services (tests). */
+  forecasts?: WeatherProvider
+  places?: PlaceDirectory
+  locator?: PlaceLocator
 }
 
 /** Real AI per mode, every Claude call running as the stylist agent; one SDK client per API key. */
@@ -87,6 +101,16 @@ function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: Ad
       cli: (s) => new ClaudeCliGarmentAnalyst({ runner, model: s.model, agent }),
       api: (s, apiKey) => new ClaudeApiGarmentAnalyst({ messages: messages(apiKey), model: s.model, agent }),
     },
+  }
+}
+
+/** Open-Meteo (forecasts cached) and GeoJS in the app; network-free stand-ins otherwise. */
+function weatherServices(options: ContainerOptions, clock: Clock) {
+  const live = options.weather === 'open-meteo'
+  return {
+    provider: options.forecasts ?? (live ? new CachedWeatherProvider(new OpenMeteoWeather()) : new DemoWeatherProvider(() => clock.now())),
+    places: options.places ?? (live ? new OpenMeteoPlaceDirectory() : new DemoPlaceDirectory()),
+    locator: options.locator ?? (live ? new GeoJsPlaceLocator() : new DemoPlaceLocator()),
   }
 }
 
@@ -137,6 +161,7 @@ export async function createContainer(options: ContainerOptions) {
     preview: options.imaging === 'studio' ? analysisPreview : undefined,
   })
 
+  const weather = new WeatherService({ location: () => settings.location(), clock, ...weatherServices(options, clock) })
   const items = new ItemService(itemRepo, lookRepo, images, clock)
   const uploads = new UploadService({ uploads: new SqliteUploadRepository(database.db), images, pipeline, items, clock })
   // Photos still waiting when the app last closed are prepared now.
@@ -147,10 +172,11 @@ export async function createContainer(options: ContainerOptions) {
     photos: new PhotoService(images, pipeline),
     uploads,
     looks: new StyleMatchService(lookRepo),
-    styling: new StylingService(itemRepo, lookRepo, () => settings.resolveAdvisor(), clock),
+    styling: new StylingService(itemRepo, lookRepo, () => settings.resolveAdvisor(), clock, weather),
     settings,
     tagging: new TaggingService(images, () => settings.resolveTagger()),
-    today: new TodayService(itemRepo, lookRepo, () => settings.resolveAdvisor(), new RuleBasedStyleAdvisor(), clock),
+    today: new TodayService(itemRepo, lookRepo, () => settings.resolveAdvisor(), new RuleBasedStyleAdvisor(), clock, weather),
+    weather,
     images,
     allowReset: options.allowReset ?? false,
     /** The user's "start fresh": every item, look and photo goes; settings and the API key stay. */

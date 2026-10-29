@@ -18,29 +18,52 @@ const vm = useHomePage()
       <section
         v-if="vm.welcome.value"
         aria-labelledby="welcome-title"
-        class="mb-10 flex items-center gap-5 rounded-[2rem] bg-cream px-8 py-6"
+        class="mb-10 rounded-[2rem] bg-cream px-8 py-6"
         data-testid="stylist-welcome"
       >
-        <Icon name="lucide:sparkles" class="size-6 shrink-0 text-rose" />
-        <div class="min-w-0 flex-1">
-          <h2 id="welcome-title" class="font-display text-2xl text-ink">Meet {{ vm.welcome.value.name }}, your stylist</h2>
-          <p class="mt-1 text-sm text-taupe">
-            {{ vm.welcome.value.name }} was set up on this computer just for you. It cuts out every piece you add, fills in the details and styles your looks.
-          </p>
+        <div class="flex items-start gap-5">
+          <Icon name="lucide:sparkles" class="mt-1.5 size-6 shrink-0 text-rose" />
+          <div class="min-w-0 flex-1">
+            <h2 id="welcome-title" class="font-display text-2xl text-ink">Meet {{ vm.welcome.value.name }}, your stylist</h2>
+            <p class="mt-1 text-sm text-taupe">
+              {{ vm.welcome.value.name }} was set up on this computer just for you. It cuts out every piece you add, fills in the details and styles your looks.
+            </p>
+
+            <div class="mt-5" data-testid="welcome-city">
+              <p class="mb-2 text-[0.7rem] uppercase tracking-[0.2em] text-taupe">Where do you live?</p>
+              <p v-if="vm.welcomeLocating.value" role="status" class="flex items-center gap-2 text-sm text-taupe">
+                <Icon name="lucide:loader-circle" class="size-4 animate-spin text-rose" /> Finding your city…
+              </p>
+              <p v-else-if="vm.welcomePlace.value && !vm.pickingPlace.value" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink">
+                <span class="flex items-center gap-1.5">
+                  <Icon name="lucide:map-pin" class="size-4 text-rose" />
+                  <span data-testid="welcome-place">{{ vm.welcomePlace.value }}</span>
+                </span>
+                <button type="button" class="text-xs text-taupe underline underline-offset-2 hover:text-ink" @click="vm.changePlace">
+                  Not here?
+                </button>
+              </p>
+              <LocationPicker v-else class="max-w-xl" @pick="vm.pickPlace" />
+              <p class="mt-2 text-xs text-taupe">
+                {{ vm.welcome.value.name }} checks the weather there, so today's look and every look you style suit the day. Change it any time in Settings.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="h-10 shrink-0 rounded-full bg-rose px-5 text-sm font-medium text-white transition-colors hover:bg-[#ad6b72]"
+            @click="vm.dismissWelcome"
+          >
+            Lovely
+          </button>
         </div>
-        <button
-          type="button"
-          class="h-10 shrink-0 rounded-full bg-rose px-5 text-sm font-medium text-white transition-colors hover:bg-[#ad6b72]"
-          @click="vm.dismissWelcome"
-        >
-          Lovely
-        </button>
       </section>
 
       <HomeTodayHero
         v-if="vm.today.value"
         :entry="vm.today.value"
         :date-label="vm.todayLabel"
+        :weather="vm.todayWeather.value"
         @toggle-favourite="vm.toggleFavourite"
       />
       <div
@@ -61,6 +84,12 @@ const vm = useHomePage()
         title="No recommendation yet"
         text="Add a few pieces to your wardrobe and a look will be waiting for you here."
       />
+
+      <p v-if="vm.askForCity.value" class="mt-6 flex items-center gap-2 pl-2 text-xs text-taupe" data-testid="ask-for-city">
+        <Icon name="lucide:cloud-sun" class="size-4 text-rose" />
+        Tell Dardar where you live and today's look will suit the weather.
+        <NuxtLink to="/settings" class="underline underline-offset-2 hover:text-ink">Add your city</NuxtLink>
+      </p>
 
       <section aria-labelledby="recent-title" class="mt-20">
         <UiSectionHeader id="recent-title" eyebrow="Style matches" title="Recently styled" />

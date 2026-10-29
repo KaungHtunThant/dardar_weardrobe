@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DayWeatherSchema } from './weather'
 
 const line = z.string().trim().min(1).max(300)
 
@@ -36,6 +37,8 @@ export const StyleMatchSchema = z.object({
   isFavourite: z.boolean().default(false),
   /** Set when this look was chosen as the recommendation for that day. */
   dailyPickDate: z.iso.date().optional(),
+  /** The forecast the look was styled and rated for, if the stylist had one. */
+  weather: DayWeatherSchema.optional(),
   createdAt: z.iso.datetime(),
 })
 export type StyleMatch = z.infer<typeof StyleMatchSchema>

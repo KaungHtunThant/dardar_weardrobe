@@ -7,7 +7,7 @@ const vm = useSettingsPage()
 <template>
   <div class="mx-auto max-w-3xl px-10 pt-10 pb-24">
     <h1 class="font-display text-4xl font-medium text-ink">Settings</h1>
-    <p class="mt-1 text-sm text-taupe">Choose who styles and judges your looks.</p>
+    <p class="mt-1 text-sm text-taupe">Choose who styles and judges your looks, and where you get dressed.</p>
 
     <p v-if="vm.error.value" role="alert" class="mt-6 rounded-xl bg-blush-soft px-4 py-3 text-sm text-rose">{{ vm.error.value }}</p>
 
@@ -27,6 +27,42 @@ const vm = useSettingsPage()
       >
         Set up again
       </button>
+    </section>
+
+    <section aria-labelledby="location-title" class="mt-10" data-testid="settings-location">
+      <h2 id="location-title" class="mb-1 font-display text-2xl text-ink">Your city</h2>
+      <p class="mb-4 text-sm text-taupe">Dardar checks the weather here, so today's look and the looks you style in the studio suit the day.</p>
+      <div class="flex items-center gap-4 rounded-2xl border border-line bg-surface px-5 py-4">
+        <span class="grid size-10 shrink-0 place-items-center rounded-full bg-cream text-rose">
+          <Icon name="lucide:map-pin" class="size-5" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <template v-if="vm.location.value">
+            <p class="font-display text-xl text-ink" data-testid="location-label">{{ vm.location.value.label }}</p>
+            <p v-if="vm.location.value.detail" class="text-xs text-taupe">{{ vm.location.value.detail }}</p>
+          </template>
+          <p v-else class="text-sm text-taupe" data-testid="location-label">No city yet: looks don't follow the weather.</p>
+        </div>
+        <button
+          v-if="vm.location.value"
+          type="button"
+          :disabled="vm.saving.value"
+          class="h-9 shrink-0 rounded-full px-3 text-xs text-taupe transition-colors hover:text-ink disabled:opacity-50"
+          @click="vm.removeLocation"
+        >
+          Remove
+        </button>
+        <button
+          type="button"
+          :aria-expanded="vm.editingLocation.value"
+          class="h-9 shrink-0 rounded-full border border-line px-4 text-xs text-taupe transition-colors hover:border-blush hover:text-ink"
+          @click="vm.changeLocation"
+        >
+          {{ vm.editingLocation.value ? 'Cancel' : vm.location.value ? 'Change' : 'Add your city' }}
+        </button>
+      </div>
+      <LocationPicker v-if="vm.editingLocation.value" class="mt-3" @pick="vm.pickLocation" />
+      <p class="mt-2 text-xs text-taupe">Forecasts come from Open-Meteo; only the city's coordinates are sent.</p>
     </section>
 
     <section aria-labelledby="stylist-title" class="mt-10">

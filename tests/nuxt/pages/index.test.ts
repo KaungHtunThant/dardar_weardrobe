@@ -22,6 +22,20 @@ describe('home page', () => {
     expect(wrapper.find('[data-testid="today-collage"] img').attributes('src')).toMatch(/^\/garments\//)
   })
 
+  it('suggests the detected city in the welcome, and searches for another', async () => {
+    setupTestGateway()
+    const wrapper = await mountSuspended(IndexPage)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="welcome-place"]').text()).toBe('Paris, France')
+    await wrapper.findAll('button').find((b) => b.text() === 'Not here?')!.trigger('click')
+    expect(wrapper.find('[data-testid="location-picker"]').exists()).toBe(true)
+    await wrapper.get('#city-search').setValue('Seoul')
+    await wrapper.get('form[role="search"]').trigger('submit')
+    await flushPromises()
+    await wrapper.findAll('[aria-label="Cities"] button')[0]!.trigger('click')
+    expect(wrapper.get('[data-testid="welcome-place"]').text()).toBe('Seoul, South Korea')
+  })
+
   it('shows empty states with an empty wardrobe', async () => {
     setupTestGateway({ items: [], styleMatches: [] })
     const wrapper = await mountSuspended(IndexPage)

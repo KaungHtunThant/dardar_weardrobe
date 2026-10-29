@@ -1,9 +1,12 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { DEFAULT_MODEL, type AdvisorMode, type Settings } from '#shared/models/settings'
+import type { Place } from '#shared/models/weather'
+import { placeLabel } from '#shared/utils/weather'
 import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useUploadsStore } from '~/stores/uploads'
 import { useWardrobeStore } from '~/stores/wardrobe'
+import { useWeatherStore } from '~/stores/weather'
 import { onViewMounted } from '~/services/lifecycle'
 
 export interface ModeOption {
@@ -36,7 +39,7 @@ const RUNS_ON: Record<AdvisorMode, string> = {
 
 const sinceFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
-/** Settings page controller: choose the stylist (Claude CLI / API / Offline), model, effort and API key. */
+/** Settings page controller: choose the stylist (Claude CLI / API / Offline), model, effort, API key and city. */
 export function useSettingsPage() {
   const store = useSettingsStore()
   const form = reactive<SettingsForm>({ advisor: 'offline', model: DEFAULT_MODEL, effort: 'medium' })
@@ -61,6 +64,32 @@ export function useSettingsPage() {
     if (!info) return null
     return { name: info.displayName, since: sinceFormat.format(new Date(info.createdAt)), runsOn: RUNS_ON[view.value!.advisor] }
   })
+
+  /** The city looks are dressed for; it saves as soon as it's picked. */
+  const location = computed(() => {
+    const place = view.value?.location
+    return place ? { label: placeLabel(place), detail: place.region ?? '' } : null
+  })
+  const editingLocation = ref(false)
+
+  function changeLocation() {
+    editingLocation.value = !editingLocation.value
+  }
+
+  async function saveLocation(place: Place | null, message: string) {
+    if (!(await store.update({ location: place }))) return
+    useWeatherStore().forget()
+    editingLocation.value = false
+    flash(message)
+  }
+
+  function pickLocation(place: Place) {
+    return saveLocation(place, `Dardar will dress you for the weather in ${placeLabel(place)}.`)
+  }
+
+  function removeLocation() {
+    return saveLocation(null, 'City removed. Looks no longer follow the weather.')
+  }
 
   const keyStatus = computed(() => {
     const key = view.value?.apiKey
@@ -190,6 +219,11 @@ export function useSettingsPage() {
     view,
     agent,
     recreateAgent,
+    location,
+    editingLocation,
+    changeLocation,
+    pickLocation,
+    removeLocation,
     modes,
     models: MODELS,
     efforts: EFFORTS,

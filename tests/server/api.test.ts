@@ -3,6 +3,7 @@ import { ofetch } from 'ofetch'
 import type { StyleAdvisor } from '#shared/contracts/StyleAdvisor'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
 import { createSseParser } from '#shared/utils/sse'
+import { localIsoDate } from '#shared/utils/date'
 import { startApi } from './harness'
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
@@ -124,6 +125,40 @@ describe('API', () => {
     await ofetch(`${api.baseURL}/api/items/${item.id}/photo`, { method: 'PUT', body: second })
     expect((await fetch(`${api.baseURL}${first.cleanImage}`)).status).toBe(404)
     expect((await fetch(`${api.baseURL}${second.cleanImage}`)).status).toBe(200)
+  })
+})
+
+describe('weather and places API (offline demo services in tests)', () => {
+  const paris = { name: 'Paris', region: 'Île-de-France', country: 'France', latitude: 48.8534, longitude: 2.3488, timezone: 'Europe/Paris' }
+
+  it('finds cities and guesses where the computer is', async () => {
+    api = await startApi(seed())
+    const found = await ofetch(`${api.baseURL}/api/places`, { query: { q: 'lond' } })
+    expect(found[0]).toMatchObject({ name: 'London', country: 'United Kingdom' })
+    expect(await ofetch(`${api.baseURL}/api/places`, { query: { q: '' } })).toEqual([])
+    expect(await ofetch(`${api.baseURL}/api/places/here`)).toEqual({ place: paris })
+  })
+
+  it("has no weather until a city is set, then today's forecast there", async () => {
+    api = await startApi(seed())
+    const date = localIsoDate(new Date())
+    expect(await ofetch(`${api.baseURL}/api/weather`, { query: { date } })).toEqual({ weather: null })
+    await ofetch(`${api.baseURL}/api/settings`, { method: 'PUT', body: { location: paris } })
+    const { weather } = await ofetch(`${api.baseURL}/api/weather`, { query: { date } })
+    expect(weather).toMatchObject({ date, place: 'Paris, France' })
+    expect(await status(ofetch(`${api.baseURL}/api/weather`, { query: { date: 'soon' } }))).toBe(400)
+  })
+
+  it('answers 503 when the city search is unreachable', async () => {
+    api = await startApi(seed(), { places: { search: async () => Promise.reject(new Error('ENOTFOUND')) } })
+    expect(await status(ofetch(`${api.baseURL}/api/places`, { query: { q: 'Paris' } }))).toBe(503)
+  })
+
+  it('styles looks for the weather where the user lives', async () => {
+    api = await startApi(seed())
+    await ofetch(`${api.baseURL}/api/settings`, { method: 'PUT', body: { location: paris } })
+    const look = await ofetch(`${api.baseURL}/api/looks/generate`, { method: 'POST', body: { fillCategories: ['tops', 'bottoms'] } })
+    expect(look.weather?.place).toBe('Paris, France')
   })
 })
 
