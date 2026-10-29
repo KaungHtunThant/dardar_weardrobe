@@ -1,6 +1,6 @@
 # Phase 8: What your wardrobe is missing
 
-**Status:** Done
+**Status:** Done (commit `78cb28a`)
 
 The user asked for a new Home section with suggestions for the pieces the wardrobe is missing.
 
