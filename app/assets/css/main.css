@@ -49,6 +49,14 @@
     filter: drop-shadow(var(--shadow-garment));
     object-fit: contain;
   }
+
+  /* The upload tray sits in the bottom-right corner, stacked above a page's floating button (.fab) when there is one. */
+  .upload-dock {
+    bottom: 2rem;
+  }
+  :root:has(.fab) .upload-dock {
+    bottom: 6.5rem; /* 2rem + the button's 3.5rem + 1rem gap */
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

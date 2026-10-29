@@ -5,7 +5,7 @@ const vm = useUploadTray()
 </script>
 
 <template>
-  <div v-if="vm.visible.value" class="pointer-events-none fixed right-8 bottom-8 z-40 flex flex-col items-end gap-3">
+  <div v-if="vm.visible.value" class="upload-dock pointer-events-none fixed right-8 z-40 flex flex-col items-end gap-3">
     <section
       v-if="vm.open.value"
       id="upload-tray-panel"

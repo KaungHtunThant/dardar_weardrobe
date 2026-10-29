@@ -113,3 +113,6 @@ Decisions made while building it (the user can revisit them):
 - Open-Meteo's free tier is non-commercial, like SegFormer's licence. Selling the app means a paid plan or another `WeatherProvider`, which is one new class.
 - Today's pick keeps the forecast it was styled with. It is not restyled when the forecast changes during the day, only when the city does.
 - The Studio's AI fill doesn't switch on *Outerwear* by itself on a cold day. Instead the verdict calls out the missing coat and offers it as a fix.
+
+## Fix after the phase: the upload tray covered *Add item*
+The upload tray (in the layout) and the wardrobe's floating *Add item* button (on the page) were both fixed to the bottom-right corner, and the tray sat on top, so while photos were being prepared the button couldn't be clicked. The tray now uses the `.upload-dock` utility (`main.css`): it sits in the corner, or **stacks above any page's floating button** (`.fab`, matched with `:root:has(.fab)`). That is pure CSS, so no view gains logic. e2e: *the upload tray never covers the Add item button* checks that neither the pill nor its open panel overlaps the button and that the button still opens the dialog.

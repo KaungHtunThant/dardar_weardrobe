@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
 const svgPhoto = {
@@ -79,4 +79,26 @@ test('an added item survives a reload', async ({ page }) => {
   await expect(page.getByTestId('rail-item')).toHaveCount(5)
   await page.reload()
   await expect(page.getByTestId('rail-item').first()).toContainText('Pink Beret')
+})
+
+test('the upload tray never covers the Add item button', async ({ page }) => {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Wardrobe' }).click()
+  const add = page.getByRole('button', { name: 'Add item' })
+  await add.click()
+  await page.getByRole('dialog', { name: 'Add to your wardrobe' }).getByLabel('Choose photos').setInputFiles(svgPhoto)
+  const tray = page.getByTestId('upload-tray')
+  await expect(tray).toBeVisible()
+
+  const overlap = async (selector: Locator) => {
+    const [a, b] = [await add.boundingBox(), await selector.boundingBox()]
+    return a!.x < b!.x + b!.width && b!.x < a!.x + a!.width && a!.y < b!.y + b!.height && b!.y < a!.y + a!.height
+  }
+  expect(await overlap(tray)).toBe(false)
+  await tray.click()
+  await expect(page.getByTestId('upload-tray-panel')).toBeVisible()
+  expect(await overlap(page.getByTestId('upload-tray-panel'))).toBe(false)
+
+  // Still reachable: Playwright refuses to click a button another element sits on.
+  await add.click({ timeout: 5_000 })
+  await expect(page.getByRole('dialog', { name: 'Add to your wardrobe' })).toBeVisible()
 })
