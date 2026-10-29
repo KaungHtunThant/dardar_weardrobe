@@ -1,10 +1,12 @@
 import { computed, ref, watch } from 'vue'
+import { getCategory } from '#shared/models/category'
 import type { Item } from '#shared/models/item'
 import type { StyleMatch } from '#shared/models/styleMatch'
 import type { Place } from '#shared/models/weather'
 import { localIsoDate, longDayLabel } from '#shared/utils/date'
 import { resolveLookItems } from '#shared/utils/looks'
 import { placeLabel, weatherIcon, weatherLine } from '#shared/utils/weather'
+import { useGapsStore } from '~/stores/gaps'
 import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
@@ -14,6 +16,19 @@ import { onViewMounted, onViewUnmounted } from '../lifecycle'
 export interface LookWithItems {
   look: StyleMatch
   items: Item[]
+}
+
+/** A piece the wardrobe is missing, ready to show. */
+export interface MissingPiece {
+  key: string
+  name: string
+  category: string
+  icon: string
+  reason: string
+  /** e.g. "black · camel" */
+  colors: string
+  /** Pieces already owned that it would be worn with. */
+  pairsWith: Item[]
 }
 
 const RECENT_LIMIT = 8
@@ -30,6 +45,7 @@ export function useHomePage() {
   const looks = useStyleMatchesStore()
   const settings = useSettingsStore()
   const weather = useWeatherStore()
+  const missing = useGapsStore()
   const now = new Date()
   const todayIso = localIsoDate(now)
 
@@ -50,6 +66,31 @@ export function useHomePage() {
   const todayStage = computed(() => TODAY_STAGES.find(([after]) => waited.value >= after)![1])
   const recent = computed(() => looks.recent(RECENT_LIMIT).map(withItems))
   const favourites = computed(() => looks.favourites.map(withItems))
+
+  /** What the wardrobe is missing, each with the owned pieces it goes with. */
+  const gaps = computed<MissingPiece[]>(() =>
+    (missing.report?.gaps ?? []).map((g, n) => {
+      const category = getCategory(g.category)
+      return {
+        key: `${n}-${g.name}`,
+        name: g.name,
+        category: category.label,
+        icon: category.icon,
+        reason: g.reason,
+        colors: g.colors.join(' · '),
+        pairsWith: g.pairsWithItemIds.flatMap((id) => wardrobe.items.find((i) => i.id === id) ?? []),
+      }
+    }),
+  )
+  const gapsLoading = computed(() => missing.loading)
+  const gapsRefreshing = computed(() => missing.refreshing)
+  const gapsError = computed(() => missing.error)
+  /** Only once there is a wardrobe to look through. */
+  const showGaps = computed(() => wardrobe.items.length > 0)
+
+  function refreshGaps() {
+    return missing.refresh()
+  }
 
   /** The weather today's look was styled for. */
   const todayWeather = computed(() => {
@@ -95,16 +136,16 @@ export function useHomePage() {
     const saved = await settings.update({ welcomed: true, ...(location ? { location } : {}) })
     if (saved && location) {
       weather.forget()
-      // Today's look was styled before Dardar knew the weather: the backend styles it again.
-      await looks.loadToday(todayIso)
+      // Today's look and the missing pieces were written before Dardar knew the climate: the backend redoes them.
+      await Promise.all([looks.loadToday(todayIso), showGaps.value ? missing.load() : null])
     }
   }
 
   async function init() {
     await Promise.all([wardrobe.load(), looks.load(), settings.view ? null : settings.load()])
     if (welcome.value) void guessPlace()
-    // Styling today's look may take a while with Claude; the rest of Home shows meanwhile.
-    await looks.loadToday(todayIso)
+    // Styling today's look and finding what's missing may take a while with Claude; the rest of Home shows meanwhile.
+    await Promise.all([looks.loadToday(todayIso), wardrobe.items.length ? missing.load() : null])
   }
 
   function toggleFavourite(id: string) {
@@ -129,6 +170,12 @@ export function useHomePage() {
     todayLoading,
     todayStage,
     recent,
+    gaps,
+    gapsLoading,
+    gapsRefreshing,
+    gapsError,
+    showGaps,
+    refreshGaps,
     favourites,
     todayLabel: longDayLabel(now),
     init,

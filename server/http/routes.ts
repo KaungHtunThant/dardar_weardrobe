@@ -1,5 +1,6 @@
 import { createRouter, eventHandler, type H3Event } from 'h3'
 import type { Container } from '../container'
+import { GapController } from '../controllers/GapController'
 import { ImageController } from '../controllers/ImageController'
 import { ItemController } from '../controllers/ItemController'
 import { LookController } from '../controllers/LookController'
@@ -32,6 +33,7 @@ export function createApiRouter(c: Container) {
   const settings = new SettingsController(c.settings)
   const wardrobe = new WardrobeController(() => c.clearWardrobe())
   const weather = new WeatherController(c.weather)
+  const gaps = new GapController(c.gaps)
 
   const router = createRouter({ preemptive: true })
     .get('/api/items', handle(() => items.list()))
@@ -60,6 +62,8 @@ export function createApiRouter(c: Container) {
     .get('/api/places', handle((e) => weather.searchPlaces(e)))
     .get('/api/places/here', handle(() => weather.here()))
     .post('/api/wardrobe/clear', handle((e) => wardrobe.clear(e)))
+    .get('/api/wardrobe/gaps', handle(() => gaps.show()))
+    .post('/api/wardrobe/gaps/refresh', handle(() => gaps.refresh()))
 
   if (c.allowReset) router.post('/api/dev/reset', handle(async () => ({ reset: await c.reset() })))
   return router

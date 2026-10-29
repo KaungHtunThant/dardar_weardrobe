@@ -43,6 +43,10 @@ const MIGRATIONS: string[] = [
      created_at TEXT NOT NULL
    );`,
   `ALTER TABLE style_matches ADD COLUMN weather TEXT;`,
+  `CREATE TABLE gap_reports (
+     id TEXT PRIMARY KEY,
+     report TEXT NOT NULL
+   );`,
 ]
 
 export function migrate(sqlite: DatabaseSync) {

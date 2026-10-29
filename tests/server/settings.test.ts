@@ -150,6 +150,27 @@ describe('SettingsService', () => {
     expect(await nameOfAnalyst()).toBe('api:sk-9')
   })
 
+  it('resolves the missing-pieces advisor from the current settings, falling back to offline', async () => {
+    const named = (name: string) => ({ suggestGaps: async () => [{ category: 'tops' as const, name, reason: 'r', colors: [], pairsWithItemIds: [] }] })
+    const s = new SettingsService({
+      store: new SettingsStore(join(dir, 'settings.json')),
+      secrets: new FileSecretStore(join(dir, 'secrets.json')),
+      runner: cliMissing,
+      advisors: factory,
+      gapAdvisors: { offline: () => named('offline'), cli: (x) => named(`cli:${x.model}`), api: (x, key) => named(`api:${x.effort}:${key}`) },
+      envApiKey: () => null,
+      defaultAdvisor: 'auto',
+    })
+    const nameOf = async () => (await (await s.resolveGapAdvisor()).suggestGaps({ wardrobe: [] }))[0]!.name
+    expect(await nameOf()).toBe('offline')
+    await s.update({ advisor: 'claude-cli', model: 'claude-haiku-5-5' })
+    expect(await nameOf()).toBe('cli:claude-haiku-5-5')
+    await s.update({ advisor: 'claude-api', effort: 'low' })
+    expect(await nameOf()).toBe('offline')
+    await s.update({ apiKey: 'sk-9' })
+    expect(await nameOf()).toBe('api:low:sk-9')
+  })
+
   it('explains what to do when API mode has no key', async () => {
     const s = service()
     await s.update({ advisor: 'claude-api' })

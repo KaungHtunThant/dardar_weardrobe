@@ -36,11 +36,23 @@ describe('home page', () => {
     expect(wrapper.get('[data-testid="welcome-place"]').text()).toBe('Seoul, South Korea')
   })
 
+  it('shows what the wardrobe is missing, with the pieces to wear each with', async () => {
+    setupTestGateway()
+    const wrapper = await mountSuspended(IndexPage)
+    await flushPromises()
+    expect(wrapper.get('#gaps-title').text()).toBe('What your wardrobe is missing')
+    const cards = wrapper.findAll('[data-testid="missing-piece"]')
+    expect(cards.length).toBeGreaterThan(0)
+    const blazer = cards.find((c) => c.text().includes('Tailored Blazer'))!
+    expect(blazer.findAll('img.garment').length).toBeGreaterThan(0)
+  })
+
   it('shows empty states with an empty wardrobe', async () => {
     setupTestGateway({ items: [], styleMatches: [] })
     const wrapper = await mountSuspended(IndexPage)
     await flushPromises()
     expect(wrapper.text()).toContain('No recommendation yet')
     expect(wrapper.text()).toContain('No favourites yet')
+    expect(wrapper.find('[data-testid="missing-pieces"]').exists()).toBe(false)
   })
 })

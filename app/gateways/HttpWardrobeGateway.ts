@@ -6,6 +6,7 @@ import type { StyleRequestInput } from '#shared/models/styleRequest'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { SettingsUpdate, SettingsView } from '#shared/models/settings'
 import type { DayWeather, Place } from '#shared/models/weather'
+import type { GapReport } from '#shared/models/gap'
 import type { CategoryId } from '#shared/models/category'
 import type { Upload } from '#shared/models/upload'
 import type { StyleCallOptions, StyleProgress } from '#shared/contracts/StyleAdvisor'
@@ -153,6 +154,14 @@ export class HttpWardrobeGateway implements WardrobeGateway {
 
   async locatePlace() {
     return (await this.call(() => this.api<{ place: Place | null }>('/api/places/here'))).place
+  }
+
+  async getWardrobeGaps() {
+    return (await this.call(() => this.api<{ report: GapReport | null }>('/api/wardrobe/gaps'))).report
+  }
+
+  async refreshWardrobeGaps() {
+    return (await this.call(() => this.api<{ report: GapReport | null }>('/api/wardrobe/gaps/refresh', { method: 'POST' }))).report
   }
 
   async clearWardrobe() {

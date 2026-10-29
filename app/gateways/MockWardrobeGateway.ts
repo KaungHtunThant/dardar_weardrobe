@@ -6,7 +6,11 @@ import type { CategoryId } from '#shared/models/category'
 import type { Upload, UploadStage } from '#shared/models/upload'
 import { StyleRequestSchema, type StyleRequestInput } from '#shared/models/styleRequest'
 import { DEFAULT_MODEL, SettingsSchema, SettingsUpdateSchema, type Settings, type SettingsUpdate, type SettingsView } from '#shared/models/settings'
+import { RuleBasedGapAdvisor } from '#shared/advisors/RuleBasedGapAdvisor'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
+import type { GapReport } from '#shared/models/gap'
+import { wardrobeKey } from '#shared/utils/gaps'
+import { placeLabel } from '#shared/utils/weather'
 import type { PlaceDirectory, PlaceLocator } from '#shared/contracts/PlaceFinder'
 import type { WeatherProvider } from '#shared/contracts/WeatherProvider'
 import { localIsoDate } from '#shared/utils/date'
@@ -48,6 +52,8 @@ export class MockWardrobeGateway implements WardrobeGateway {
   private readonly forecasts: WeatherProvider
   private readonly places: PlaceDirectory
   private readonly locator: PlaceLocator
+  /** Prototype only: the missing-pieces report lives in memory. */
+  private gapReport: GapReport | null = null
   private agentCreatedAt = new Date().toISOString()
   private apiKey: string | null = null
   /** Prototype only: the upload queue lives in memory. */
@@ -317,6 +323,24 @@ export class MockWardrobeGateway implements WardrobeGateway {
   async locatePlace() {
     await this.wait(3)
     return this.locator.locate()
+  }
+
+  async getWardrobeGaps() {
+    const items = (await this.data()).items
+    const place = this.settings.location ? placeLabel(this.settings.location) : null
+    if (this.gapReport?.wardrobeKey === wardrobeKey(items) && this.gapReport.place === place) return structuredClone(this.gapReport)
+    return this.refreshWardrobeGaps()
+  }
+
+  async refreshWardrobeGaps() {
+    await this.wait(5)
+    const items = (await this.data()).items
+    if (!items.length) return (this.gapReport = null)
+    const weather = this.settings.location ? await this.getWeather(localIsoDate(this.now())) : null
+    const gaps = await new RuleBasedGapAdvisor().suggestGaps({ wardrobe: items, weather })
+    const place = this.settings.location ? placeLabel(this.settings.location) : null
+    this.gapReport = { gaps, wardrobeKey: wardrobeKey(items), place, by: 'offline', createdAt: this.now().toISOString() }
+    return structuredClone(this.gapReport)
   }
 
   async clearWardrobe() {

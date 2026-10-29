@@ -6,6 +6,7 @@ import type { StyleMatch } from '../models/styleMatch'
 import type { StyleRequestInput } from '../models/styleRequest'
 import type { SettingsUpdate, SettingsView } from '../models/settings'
 import type { DayWeather, Place } from '../models/weather'
+import type { GapReport } from '../models/gap'
 import type { StyleCallOptions } from './StyleAdvisor'
 
 /** Result of preparing an uploaded photo: the original and the garment-only version. */
@@ -79,6 +80,14 @@ export interface WeatherGateway {
   locatePlace(): Promise<Place | null>
 }
 
+/** What the wardrobe is missing, according to the stylist. */
+export interface GapGateway {
+  /** The kept report while it fits the wardrobe, else a new one (may take a while with Claude); null for an empty wardrobe. */
+  getWardrobeGaps(): Promise<GapReport | null>
+  /** Asks the stylist again. */
+  refreshWardrobeGaps(): Promise<GapReport | null>
+}
+
 export interface DataGateway {
   /** Deletes every item, photo and look so the user can start fresh. Settings and the API key stay. */
   clearWardrobe(): Promise<void>
@@ -93,4 +102,5 @@ export interface WardrobeGateway
     StylingGateway,
     SettingsGateway,
     WeatherGateway,
+    GapGateway,
     DataGateway {}

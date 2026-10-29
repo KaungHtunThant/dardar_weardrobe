@@ -4,6 +4,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 
 - **Add clothes:** the user adds photos (several at once) and carries on. In the background, the stylist finds the garment and Dardar cuts exactly that out (no person, hanger or background), centred like the sample images. The user then reviews the suggested details and saves.
 - **Get looks:** Claude style-matches the user's existing clothes into looks, with or without a custom prompt. Every Claude call runs as **Dardar**, the stylist agent set up on first launch, through the Claude Code CLI or the Anthropic API, whichever the user prefers.
+- **What's missing:** Home lists the few pieces the wardrobe lacks, why, and what the user already owns to wear each with.
 - **Dressed for the weather:** on first launch Dardar suggests the user's city (they can pick another, here or in Settings). Today's recommendation and the Studio's *Generate & rate* then dress for, and judge against, that day's forecast (Open-Meteo).
 
 ## Documents
@@ -20,6 +21,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | [phases/phase-4-ai.md](phases/phase-4-ai.md) | Local background removal; Claude (CLI or API) or Offline styling and brutal ratings; settings; daily pick; add-item pre-fill |
 | [phases/phase-6.md](phases/phase-6.md) | Dardar the stylist agent (first launch); the garment studio (cut out exactly the garment, digitalized); the upload queue and tray |
 | [phases/phase-7.md](phases/phase-7.md) | The user's city (first launch, Settings) and the weather in today's look and the Studio |
+| [phases/phase-8.md](phases/phase-8.md) | Home: what your wardrobe is missing (Claude or offline rules, climate-aware) |
 
 ## Phase status
 
@@ -33,6 +35,7 @@ Dardar Wardrobe is a personal wardrobe database with an AI fashion advisor. It r
 | 5: Manage, library, streaming, installer | Done | `60d0b16`, `5de3875`, `31a6317`, `4bf1da1` (+ CI fixes) |
 | 6: Stylist agent, garment studio, upload queue | Done | `7e5a538`, `f834a7e`, `73ffa3d`, `1f60d13` |
 | 7: Location and weather | Done | `dfd4d6d` |
+| 8: Missing pieces | Done | see [phase-8.md](phases/phase-8.md) |
 
 ## Running the app
 

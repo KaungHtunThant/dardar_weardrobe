@@ -13,3 +13,14 @@ test('favouriting a recent look adds it to favourite looks', async ({ page }) =>
   await page.getByRole('button', { name: 'Add Date Night to favourites' }).first().click()
   await expect(favourites).toHaveCount(before + 1)
 })
+
+test('home lists what the wardrobe is missing and can ask again', async ({ page }) => {
+  const section = page.getByTestId('missing-pieces')
+  await expect(section.getByRole('heading', { name: 'What your wardrobe is missing' })).toBeVisible()
+  const blazer = section.getByTestId('missing-piece').filter({ hasText: 'Tailored Blazer' })
+  await expect(blazer).toBeVisible()
+  await expect(blazer.getByRole('list', { name: 'Wear the Tailored Blazer with' }).getByRole('img').first()).toBeVisible()
+  await section.getByRole('button', { name: 'Ask Dardar again' }).click()
+  await expect(section.getByRole('button', { name: 'Ask Dardar again' })).toBeEnabled()
+  await expect(blazer).toBeVisible()
+})

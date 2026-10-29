@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { GapReportRepository } from '#shared/contracts/GapReportRepository'
 import type { ItemRepository } from '#shared/contracts/ItemRepository'
+import type { GapReport } from '#shared/models/gap'
 import type { StyleMatchRepository } from '#shared/contracts/StyleMatchRepository'
 import type { UploadRepository } from '#shared/contracts/UploadRepository'
 import type { Upload } from '#shared/models/upload'
@@ -155,6 +157,29 @@ export function uploadRepositoryContract(name: string, make: () => UploadReposit
       expect(await repo.delete('a')).toBe(true)
       expect(await repo.delete('a')).toBe(false)
       expect(await repo.findAll()).toEqual([])
+    })
+  })
+}
+
+/** Behaviour every GapReportRepository must share. */
+export function gapReportRepositoryContract(name: string, make: () => GapReportRepository) {
+  const report: GapReport = {
+    gaps: [{ category: 'accessories', name: 'Black Leather Belt', reason: 'You have none.', colors: ['black'], pairsWithItemIds: ['item-straight-jeans'] }],
+    wardrobeKey: '33-abc',
+    place: 'Paris, France',
+    by: 'offline',
+    createdAt: '2026-10-30T08:00:00.000Z',
+  }
+
+  describe(`GapReportRepository contract: ${name}`, () => {
+    it('has no report at first, then keeps the latest one unchanged', async () => {
+      const repo = make()
+      expect(await repo.current()).toBeNull()
+      await repo.save(report)
+      expect(await repo.current()).toEqual(report)
+      const next = { ...report, gaps: [], wardrobeKey: '34-def', place: null, by: 'claude' as const }
+      await repo.save(next)
+      expect(await repo.current()).toEqual(next)
     })
   })
 }

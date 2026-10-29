@@ -33,13 +33,18 @@ export interface StylePayload {
 const OPEN = '<wardrobe_request>'
 const CLOSE = '</wardrobe_request>'
 
+/** The wardrobe as the model sees it: only what styling needs, in a stable order (so prompts cache). */
+export function modelWardrobe(items: readonly Item[]): StylePayload['wardrobe'] {
+  return [...items]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((i) => ({ id: i.id, name: i.name, category: i.category, colors: i.colors, seasons: i.seasons, occasions: i.occasions, brand: i.brand ?? null }))
+}
+
 function payloadFor(request: StyleAdvisorRequest): StylePayload {
   const byId = new Map(request.wardrobe.map((i) => [i.id, i]))
   const covered = new Set(request.pinnedItemIds.map((id) => byId.get(id)?.category))
   return {
-    wardrobe: [...request.wardrobe]
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .map((i) => ({ id: i.id, name: i.name, category: i.category, colors: i.colors, seasons: i.seasons, occasions: i.occasions, brand: i.brand ?? null })),
+    wardrobe: modelWardrobe(request.wardrobe),
     pinnedItemIds: [...request.pinnedItemIds],
     mayAddFrom: request.fillCategories.filter((c) => !covered.has(c)),
     brief: request.prompt?.trim() || null,

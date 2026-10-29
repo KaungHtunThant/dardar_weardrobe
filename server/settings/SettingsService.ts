@@ -1,3 +1,4 @@
+import type { GapAdvisor } from '#shared/contracts/GapAdvisor'
 import type { GarmentAnalyst } from '#shared/contracts/GarmentAnalyst'
 import type { GarmentTagger } from '#shared/contracts/GarmentTagger'
 import type { SecretStore } from '#shared/contracts/SecretStore'
@@ -29,6 +30,12 @@ export interface AnalystFactory {
   api(settings: Settings, apiKey: string): GarmentAnalyst
 }
 
+export interface GapAdvisorFactory {
+  offline(): GapAdvisor
+  cli(settings: Settings): GapAdvisor
+  api(settings: Settings, apiKey: string): GapAdvisor
+}
+
 /** The on-device stylist agent, as far as settings are concerned. */
 export interface StylistAgentSetup {
   info(): StylistAgentInfo | null
@@ -45,6 +52,8 @@ export interface SettingsServiceOptions {
   advisors: AdvisorFactory
   taggers?: TaggerFactory
   analysts?: AnalystFactory
+  /** Who finds what the wardrobe is missing. */
+  gapAdvisors?: GapAdvisorFactory
   /** ANTHROPIC_API_KEY from the environment, which wins over a stored key. */
   envApiKey: () => string | null
   /** 'auto' picks CLI → API → Offline on first run; tests pin 'offline'. */
@@ -140,6 +149,12 @@ export class SettingsService {
   async resolveAnalyst(): Promise<GarmentAnalyst> {
     const a = this.o.analysts
     return a ? this.pick(a) : { analyze: async () => ({ focus: null, worn: false, details: {} }) }
+  }
+
+  /** Who finds what the wardrobe is missing; the offline rules when no AI can run. */
+  async resolveGapAdvisor(): Promise<GapAdvisor> {
+    const g = this.o.gapAdvisors
+    return g ? this.pick(g) : { suggestGaps: async () => [] }
   }
 
   /** CLI or API per the settings; offline when that mode can't run (no API key). */

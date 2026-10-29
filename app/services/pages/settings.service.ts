@@ -2,6 +2,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { DEFAULT_MODEL, type AdvisorMode, type Settings } from '#shared/models/settings'
 import type { Place } from '#shared/models/weather'
 import { placeLabel } from '#shared/utils/weather'
+import { useGapsStore } from '~/stores/gaps'
 import { useSettingsStore } from '~/stores/settings'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useUploadsStore } from '~/stores/uploads'
@@ -196,6 +197,7 @@ export function useSettingsPage() {
       await useWardrobeStore().clearAll()
       useStyleMatchesStore().forget()
       useUploadsStore().forget()
+      useGapsStore().forget()
       clearOpen.value = false
       flash('Your wardrobe is fresh and empty.')
     } catch (e) {

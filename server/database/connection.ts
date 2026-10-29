@@ -33,7 +33,7 @@ export function openDatabase(path: string) {
 
   /** Removes all rows (used by the test-only reset). */
   function clear() {
-    sqlite.exec('DELETE FROM items; DELETE FROM style_matches; DELETE FROM uploads;')
+    sqlite.exec('DELETE FROM items; DELETE FROM style_matches; DELETE FROM uploads; DELETE FROM gap_reports;')
   }
 
   return { db, sqlite, clear, close: () => sqlite.close() }

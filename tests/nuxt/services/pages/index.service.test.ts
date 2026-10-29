@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils'
 import { DEMO_PLACES } from '#shared/weather/DemoWeather'
 import { useHomePage } from '~/services/pages/index.service'
 import { useSettingsStore } from '~/stores/settings'
+import { useGapsStore } from '~/stores/gaps'
 import { setupTestGateway } from '../../helpers'
 
 const tokyo = DEMO_PLACES.find((p) => p.name === 'Tokyo')!
@@ -114,6 +115,42 @@ describe('home page service', () => {
     await pending
     expect(vm.todayLoading.value).toBe(false)
     expect(vm.todayStage.value).toMatch(/reading your wardrobe/i)
+  })
+
+  it('lists what the wardrobe is missing, with the pieces each would be worn with', async () => {
+    const vm = useHomePage()
+    await vm.init()
+    expect(vm.gapsLoading.value).toBe(false)
+    const blazer = vm.gaps.value.find((g) => g.name === 'Tailored Blazer')!
+    expect(blazer).toMatchObject({ category: 'Outerwear', icon: 'lucide:cloud-sun', colors: 'black' })
+    expect(blazer.reason).toBeTruthy()
+    expect(blazer.pairsWith.length).toBeGreaterThan(0)
+    expect(blazer.pairsWith[0]).toMatchObject({ id: expect.any(String), name: expect.any(String), cleanImage: expect.any(String) })
+    expect(vm.showGaps.value).toBe(true)
+  })
+
+  it('rewrites the missing pieces for the city saved with the welcome', async () => {
+    const vm = useHomePage()
+    await vm.init()
+    await flushPromises()
+    await vm.dismissWelcome()
+    expect((await gateway.getWardrobeGaps())?.place).toBe('Paris, France')
+    expect(useGapsStore().report?.place).toBe('Paris, France')
+  })
+
+  it('asks the stylist again for the missing pieces', async () => {
+    const vm = useHomePage()
+    await vm.init()
+    const spy = vi.spyOn(gateway, 'refreshWardrobeGaps')
+    await vm.refreshGaps()
+    expect(spy).toHaveBeenCalled()
+  })
+
+  it('has no missing-pieces section for an empty wardrobe', async () => {
+    setupTestGateway({ items: [], styleMatches: [] })
+    const vm = useHomePage()
+    await vm.init()
+    expect(vm.showGaps.value).toBe(false)
   })
 
   it('formats today for the hero eyebrow', async () => {

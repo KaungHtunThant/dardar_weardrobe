@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsPage } from '~/services/pages/settings.service'
 import { useStyleMatchesStore } from '~/stores/styleMatches'
 import { useWardrobeStore } from '~/stores/wardrobe'
+import { useGapsStore } from '~/stores/gaps'
 import { DEMO_PLACES } from '#shared/weather/DemoWeather'
 import { setupTestGateway } from '../../helpers'
 
@@ -108,7 +109,8 @@ describe('settings page service', () => {
     const vm = await ready()
     const wardrobe = useWardrobeStore()
     const looks = useStyleMatchesStore()
-    await Promise.all([wardrobe.load(), looks.load()])
+    const gaps = useGapsStore()
+    await Promise.all([wardrobe.load(), looks.load(), gaps.load()])
     vm.form.model = 'claude-haiku-5-5'
     await vm.save()
 
@@ -123,6 +125,7 @@ describe('settings page service', () => {
     expect(wardrobe.items).toEqual([])
     expect(looks.looks).toEqual([])
     expect(looks.todayLook).toBeNull()
+    expect(gaps.report).toBeNull()
     expect(vm.savedMessage.value).toMatch(/fresh/i)
     expect(vm.view.value?.model).toBe('claude-haiku-5-5')
   })

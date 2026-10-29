@@ -5,6 +5,7 @@ import type { StyleRating } from '#shared/models/styleMatch'
 import type { DetailsSuggestion } from '#shared/contracts/GarmentTagger'
 import type { UploadStage, UploadState } from '#shared/models/upload'
 import type { DayWeather } from '#shared/models/weather'
+import type { GapReport } from '#shared/models/gap'
 
 export const items = sqliteTable('items', {
   id: text('id').primaryKey(),
@@ -47,4 +48,10 @@ export const uploads = sqliteTable('uploads', {
   backgroundRemoved: integer('background_removed', { mode: 'boolean' }).notNull(),
   error: text('error'),
   createdAt: text('created_at').notNull(),
+})
+
+/** One row ('current'): the latest missing-pieces report. */
+export const gapReports = sqliteTable('gap_reports', {
+  id: text('id').primaryKey(),
+  report: text('report', { mode: 'json' }).$type<GapReport>().notNull(),
 })

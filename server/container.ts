@@ -6,12 +6,15 @@ import type { PlaceDirectory, PlaceLocator } from '#shared/contracts/PlaceFinder
 import type { WeatherProvider } from '#shared/contracts/WeatherProvider'
 import type { SecretStore } from '#shared/contracts/SecretStore'
 import type { StylistAgent } from '#shared/contracts/StylistAgent'
+import { RuleBasedGapAdvisor } from '#shared/advisors/RuleBasedGapAdvisor'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
 import { DemoPlaceDirectory, DemoPlaceLocator, DemoWeatherProvider } from '#shared/weather/DemoWeather'
 import type { AdvisorMode } from '#shared/models/settings'
+import { ClaudeApiGapAdvisor } from './ai/ClaudeApiGapAdvisor'
 import { ClaudeApiGarmentAnalyst } from './ai/ClaudeApiGarmentAnalyst'
 import { ClaudeApiStyleAdvisor } from './ai/ClaudeApiStyleAdvisor'
 import { ClaudeApiTagger } from './ai/ClaudeApiTagger'
+import { ClaudeCliGapAdvisor } from './ai/ClaudeCliGapAdvisor'
 import { ClaudeCliGarmentAnalyst } from './ai/ClaudeCliGarmentAnalyst'
 import { ClaudeCliStyleAdvisor } from './ai/ClaudeCliStyleAdvisor'
 import { ClaudeCliTagger } from './ai/ClaudeCliTagger'
@@ -27,11 +30,13 @@ import { GarmentStudioProcessor } from './infrastructure/GarmentStudioProcessor'
 import { PassThroughImageProcessor } from './infrastructure/PassThroughImageProcessor'
 import { SegformerClothesSegmenter } from './infrastructure/SegformerClothesSegmenter'
 import { WorkerImglyImageProcessor } from './infrastructure/WorkerImglyImageProcessor'
+import { SqliteGapReportRepository } from './repositories/SqliteGapReportRepository'
 import { SqliteItemRepository } from './repositories/SqliteItemRepository'
 import { SqliteStyleMatchRepository } from './repositories/SqliteStyleMatchRepository'
 import { SqliteUploadRepository } from './repositories/SqliteUploadRepository'
 import { systemClock, type Clock } from './services/clock'
 import { seedIfEmpty } from './services/demoSeed'
+import { GapService } from './services/GapService'
 import { GarmentPipeline } from './services/GarmentPipeline'
 import { ItemService } from './services/ItemService'
 import { PhotoService } from './services/PhotoService'
@@ -42,7 +47,7 @@ import { TodayService } from './services/TodayService'
 import { UploadService } from './services/UploadService'
 import { WeatherService } from './services/WeatherService'
 import { FileSecretStore } from './settings/FileSecretStore'
-import { SettingsService, type AdvisorFactory, type AnalystFactory, type TaggerFactory } from './settings/SettingsService'
+import { SettingsService, type AdvisorFactory, type AnalystFactory, type GapAdvisorFactory, type TaggerFactory } from './settings/SettingsService'
 import { SettingsStore } from './settings/SettingsStore'
 import { CachedWeatherProvider } from './weather/CachedWeatherProvider'
 import { GeoJsPlaceLocator } from './weather/GeoJsPlaceLocator'
@@ -67,6 +72,7 @@ export interface ContainerOptions {
   advisors?: AdvisorFactory
   taggers?: TaggerFactory
   analysts?: AnalystFactory
+  gapAdvisors?: GapAdvisorFactory
   defaultAdvisor?: 'auto' | AdvisorMode
   envApiKey?: () => string | null
   /** Forecasts and city search: Open-Meteo in the app; the offline demo in tests and e2e (the default). */
@@ -78,7 +84,11 @@ export interface ContainerOptions {
 }
 
 /** Real AI per mode, every Claude call running as the stylist agent; one SDK client per API key. */
-function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: AdvisorFactory; taggers: TaggerFactory; analysts: AnalystFactory } {
+function aiFactories(
+  runner: ProcessRunner,
+  agent: StylistAgent,
+  offlineGaps: RuleBasedGapAdvisor,
+): { advisors: AdvisorFactory; taggers: TaggerFactory; analysts: AnalystFactory; gapAdvisors: GapAdvisorFactory } {
   const offline = new RuleBasedStyleAdvisor()
   const clients = new Map<string, Anthropic>()
   const messages = (apiKey: string) => {
@@ -100,6 +110,11 @@ function aiFactories(runner: ProcessRunner, agent: StylistAgent): { advisors: Ad
       offline: () => new OfflineGarmentAnalyst(),
       cli: (s) => new ClaudeCliGarmentAnalyst({ runner, model: s.model, agent }),
       api: (s, apiKey) => new ClaudeApiGarmentAnalyst({ messages: messages(apiKey), model: s.model, agent }),
+    },
+    gapAdvisors: {
+      offline: () => offlineGaps,
+      cli: (s) => new ClaudeCliGapAdvisor({ runner, model: s.model, agent }),
+      api: (s, apiKey) => new ClaudeApiGapAdvisor({ messages: messages(apiKey), model: s.model, effort: s.effort, agent }),
     },
   }
 }
@@ -132,7 +147,9 @@ export async function createContainer(options: ContainerOptions) {
   const runner = options.runner ?? runProcess
   const settingsStore = new SettingsStore(join(dataDir, 'settings.json'))
   const agent = new LocalStylistAgent(join(dataDir, 'agent'), clock)
-  const ai = aiFactories(runner, agent)
+  // One offline gap finder: what "Offline" resolves to and the fallback, so reports say who wrote them.
+  const offlineGaps = new RuleBasedGapAdvisor()
+  const ai = aiFactories(runner, agent, offlineGaps)
   const settings = new SettingsService({
     store: settingsStore,
     agent,
@@ -141,6 +158,7 @@ export async function createContainer(options: ContainerOptions) {
     advisors: options.advisors ?? ai.advisors,
     taggers: options.taggers ?? ai.taggers,
     analysts: options.analysts ?? ai.analysts,
+    gapAdvisors: options.gapAdvisors ?? ai.gapAdvisors,
     envApiKey: options.envApiKey ?? (() => process.env.ANTHROPIC_API_KEY || null),
     defaultAdvisor: options.defaultAdvisor ?? 'auto',
   })
@@ -176,6 +194,14 @@ export async function createContainer(options: ContainerOptions) {
     settings,
     tagging: new TaggingService(images, () => settings.resolveTagger()),
     today: new TodayService(itemRepo, lookRepo, () => settings.resolveAdvisor(), new RuleBasedStyleAdvisor(), clock, weather),
+    gaps: new GapService({
+      items: itemRepo,
+      reports: new SqliteGapReportRepository(database.db),
+      advisor: () => settings.resolveGapAdvisor(),
+      fallback: offlineGaps,
+      weather,
+      clock,
+    }),
     weather,
     images,
     allowReset: options.allowReset ?? false,

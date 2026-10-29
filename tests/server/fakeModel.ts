@@ -1,4 +1,6 @@
+import { RuleBasedGapAdvisor } from '#shared/advisors/RuleBasedGapAdvisor'
 import { RuleBasedStyleAdvisor } from '#shared/advisors/RuleBasedStyleAdvisor'
+import { readGapPayload, type AiGaps } from '../../server/ai/gapPrompt'
 import type { AiSuggestion } from '../../server/ai/stylePrompt'
 import { readStylePayload } from '../../server/ai/stylePrompt'
 
@@ -52,4 +54,15 @@ export function textSnapshots(answer: unknown, chunk = 23): string[] {
   const out: string[] = []
   for (let i = chunk; i < json.length + chunk; i += chunk) out.push(json.slice(0, i))
   return out
+}
+
+/**
+ * Stands in for Claude finding wardrobe gaps: the offline rules on the prompt's payload, plus the
+ * noise a real model might add (a piece that doesn't exist, a repeated suggestion, too many).
+ */
+export async function fakeGapModel(userMessage: string): Promise<AiGaps> {
+  const payload = readGapPayload(userMessage)
+  const gaps = await new RuleBasedGapAdvisor().suggestGaps({ wardrobe: payload.wardrobe as never })
+  const noisy = gaps.map((g) => ({ ...g, pairsWithItemIds: [...g.pairsWithItemIds, 'item-ghost'] }))
+  return { gaps: [...noisy, ...noisy.slice(0, 1), ...noisy.map((g) => ({ ...g, name: `${g.name} II` }))] }
 }

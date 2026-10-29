@@ -7,6 +7,7 @@ import { ItemDetailsSchema, ItemSchema } from '#shared/models/item'
 import { StyleMatchSchema } from '#shared/models/styleMatch'
 import { seedItems, seedStyleMatches } from '#shared/fixtures/seed'
 import { DayWeatherSchema, PlaceSchema } from '#shared/models/weather'
+import { GapReportSchema } from '#shared/models/gap'
 import { localIsoDate } from '#shared/utils/date'
 
 export interface GatewaySeed {
@@ -267,6 +268,28 @@ export function wardrobeGatewayContract(name: string, make: (seed: GatewaySeed) 
       expect(dressed.weather?.place).toContain('London')
       expect((await gw.listStyleMatches()).find((l) => l.id === dressed.id)?.weather).toEqual(dressed.weather)
       expect((await gw.generateLook({ fillCategories: ['tops'], dressForWeather: false })).weather).toBeUndefined()
+    })
+
+    it("says what the wardrobe is missing, keeps it until the wardrobe changes, and can ask again", async () => {
+      const gw = await fresh()
+      const report = await gw.getWardrobeGaps()
+      expect(() => GapReportSchema.parse(report)).not.toThrow()
+      expect(report!.gaps.length).toBeGreaterThan(0)
+      const known = new Set(seedItems.map((i) => i.id))
+      for (const g of report!.gaps) for (const id of g.pairsWithItemIds) expect(known.has(id)).toBe(true)
+      expect(await gw.getWardrobeGaps()).toEqual(report)
+
+      const [london] = await gw.searchPlaces('London')
+      await gw.updateSettings({ location: london })
+      expect((await gw.getWardrobeGaps())!.place).toBe('London, United Kingdom')
+
+      await gw.deleteItem(seedItems[0]!.id)
+      expect((await gw.getWardrobeGaps())!.wardrobeKey).not.toBe(report!.wardrobeKey)
+      const refreshed = await gw.refreshWardrobeGaps()
+      expect(() => GapReportSchema.parse(refreshed)).not.toThrow()
+
+      await gw.clearWardrobe()
+      expect(await gw.getWardrobeGaps()).toBeNull()
     })
 
     it('rejects invalid settings', async () => {

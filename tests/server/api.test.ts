@@ -162,6 +162,25 @@ describe('weather and places API (offline demo services in tests)', () => {
   })
 })
 
+describe('missing pieces API', () => {
+  it('reports what the wardrobe is missing, keeps it, and asks again on request', async () => {
+    api = await startApi(seed())
+    const { report } = await ofetch(`${api.baseURL}/api/wardrobe/gaps`)
+    expect(report.gaps.length).toBeGreaterThan(0)
+    expect(report.by).toBe('offline')
+    expect((await ofetch(`${api.baseURL}/api/wardrobe/gaps`)).report).toEqual(report)
+    const again = await ofetch(`${api.baseURL}/api/wardrobe/gaps/refresh`, { method: 'POST' })
+    expect(again.report.gaps).toEqual(report.gaps)
+  })
+
+  it('has nothing to report once the wardrobe is cleared', async () => {
+    api = await startApi(seed())
+    await ofetch(`${api.baseURL}/api/wardrobe/gaps`)
+    await ofetch(`${api.baseURL}/api/wardrobe/clear`, { method: 'POST', body: { confirm: true } })
+    expect(await ofetch(`${api.baseURL}/api/wardrobe/gaps`)).toEqual({ report: null })
+  })
+})
+
 describe('POST /api/looks/generate/stream', () => {
   const post = (body: unknown, signal?: AbortSignal) =>
     fetch(`${api.baseURL}/api/looks/generate/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal })
